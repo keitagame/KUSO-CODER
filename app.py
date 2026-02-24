@@ -31,12 +31,11 @@ button{margin:2px;}
 
 <h2>クソコードバトラーズ</h2>
 <p>pythonでクソコードを組んで相手を惑わそう。<br>
-時間以内に出力を当てて、先にポイントを取った方が勝ち！</p>
+ターンが来たら自動でコードが出され、相手が答えるゲームです。</p>
 
 <div>
   <button onclick="login()">入場</button>
   <button onclick="queueMatch()">マッチング</button>
-  <button onclick="play()">スタート（自分のターンでコードを出す）</button>
 </div>
 
 <h3>デッキ（1行1コード・最大10枚）</h3>
@@ -117,20 +116,6 @@ async function queueMatch(){
   setStatus("マッチング待ち...","status-wait");
 }
 
-async function play(){
-  if(!id){log("先に入場してください");return;}
-  let r=await fetch("/play",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({id})
-  });
-  let j=await r.json();
-  if(j.code){
-    highlight(j.code);
-    log("あなたのターン: コードを出しました");
-  }
-  if(j.error)log("play error: "+j.error);
-}
-
 async function guess(){
   if(!id){log("先に入場してください");return;}
   let g=document.getElementById("guess").value;
@@ -182,9 +167,9 @@ async function update(){
     document.getElementById("opptime").innerText = j.time[opp] ?? "-";
 
     if(j.turn===myid){
-      setStatus("あなたのターン","status-play");
+      setStatus("あなたのターン（相手が答える）","status-play");
     }else{
-      setStatus("相手のターン","status-play");
+      setStatus("相手のターン（あなたが答える）","status-play");
     }
   }
 
@@ -236,6 +221,21 @@ def run_code(code):
         return "error"
 
 # =====================
+# 自動プレイ
+# =====================
+def auto_play(m):
+    pid = m["turn"]
+    deck = players[pid]["deck"]
+    if not deck:
+        m["winner"] = m["p2"] if pid == m["p1"] else m["p1"]
+        return
+
+    code = random.choice(deck)
+    m["code"] = code
+    m["answer"] = run_code(code)
+    m["last"] = pid
+
+# =====================
 # matchmaking
 # =====================
 def matchmaking():
@@ -254,8 +254,8 @@ def matchmaking():
                 "answer": None,
                 "last": None,
                 "winner": None,
-                "score": {p1: 0, p2: 0},  # スコア追加
-                "max_score": 3,           # 先取ポイント
+                "score": {p1: 0, p2: 0},
+                "max_score": 3,
             }
             players[p1]["match"] = mid
             players[p2]["match"] = mid
@@ -271,17 +271,19 @@ def timer():
         for m in list(matches.values()):
             if m.get("winner"):
                 continue
-            t = m.get("turn")
-            if not t:
-                continue
-            if t not in m["time"]:
-                continue
+
+            t = m["turn"]
             m["time"][t] -= 1
             if m["time"][t] <= 0:
-                # 時間切れ: 相手の勝ち
                 loser = t
                 winner = m["p1"] if t == m["p2"] else m["p2"]
                 m["winner"] = winner
+                continue
+
+            # ★ 自動プレイ：コードがまだ出ていない時だけ
+            if m["code"] is None:
+                auto_play(m)
+
         time.sleep(1)
 
 threading.Thread(target=timer, daemon=True).start()
@@ -306,13 +308,7 @@ class H(http.server.BaseHTTPRequestHandler):
             return
 
         if self.path.startswith("/state"):
-            parts = self.path.split("?",1)
-            if len(parts) == 1:
-                return self.reply({})
-            qs = parts[1]
-            if "=" not in qs:
-                return self.reply({})
-            pid = qs.split("=",1)[1]
+            pid = self.path.split("=")[1]
             if pid not in players:
                 return self.reply({})
             mid = players[pid].get("match")
@@ -320,7 +316,6 @@ class H(http.server.BaseHTTPRequestHandler):
                 return self.reply({"wait": 1})
             return self.reply(matches[mid])
 
-        # その他は404
         self.reply({"error":"not found"}, status=404)
 
     def do_POST(self):
@@ -355,33 +350,6 @@ class H(http.server.BaseHTTPRequestHandler):
                 queue.append(pid)
             return self.reply({"ok": 1})
 
-        if path == "/play":
-            pid = d.get("id")
-            if pid not in players:
-                return self.reply({"error":"invalid id"})
-            mid = players[pid].get("match")
-            if not mid or mid not in matches:
-                return self.reply({"error": "no match"})
-            m = matches[mid]
-
-            if m.get("winner"):
-                return self.reply({"error": "finished"})
-
-            if m.get("turn") != pid:
-                return self.reply({"error": "not turn"})
-
-            if not players[pid]["deck"]:
-                return self.reply({"error": "deck empty"})
-
-            code = random.choice(players[pid]["deck"])
-            m["code"] = code
-            m["answer"] = run_code(code)
-            m["last"] = pid
-
-            # ターン交代
-            m["turn"] = m["p2"] if pid == m["p1"] else m["p1"]
-            return self.reply({"code": code})
-
         if path == "/guess":
             pid = d.get("id")
             if pid not in players:
@@ -397,27 +365,24 @@ class H(http.server.BaseHTTPRequestHandler):
             if not m.get("answer"):
                 return self.reply({"error":"no code to guess"})
 
-            g = str(d.get("guess",""))
+            g = str(d.get("guess","")).strip()
+
             if g == m["answer"]:
-                # 正解: スコア加算
-                m["score"][pid] = m["score"].get(pid,0) + 1
-                # 勝利条件
-                if m["score"][pid] >= m.get("max_score",3):
+                m["score"][pid] += 1
+                if m["score"][pid] >= m["max_score"]:
                     m["winner"] = pid
-                # 次のターンは相手
+
                 m["turn"] = m["p2"] if pid == m["p1"] else m["p1"]
-                return self.reply({"correct":1,"score":m["score"][pid]})
+                m["code"] = None
+                m["answer"] = None
+                return self.reply({"correct":1})
             else:
-                # 不正解: 時間ペナルティ
-                if pid in m["time"]:
-                    m["time"][pid] -= 5
-                    if m["time"][pid] <= 0:
-                        # 時間切れで相手勝ち
-                        opp = m["p1"] if pid == m["p2"] else m["p2"]
-                        m["winner"] = opp
+                m["time"][pid] -= 5
+                if m["time"][pid] <= 0:
+                    opp = m["p1"] if pid == m["p2"] else m["p2"]
+                    m["winner"] = opp
                 return self.reply({"correct":0})
 
-        # その他
         self.reply({"error":"not found"}, status=404)
 
 print("http://localhost:8080")
