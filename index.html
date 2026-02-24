@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>クソコーダー</h2>
+
+<button onclick="login()">Login</button>
+<button onclick="queue()">Match</button>
+<button onclick="play()">Play</button>
+
+<h3>Deck（1行1カード）</h3>
+<textarea id="deck" rows="10" cols="50"></textarea>
+<br>
+<button onclick="save()">Save Deck</button>
+
+<h3>Game</h3>
+Turn: <span id="turn"></span><br>
+Time: <span id="time"></span><br>
+
+<pre id="code"></pre>
+
+<input id="guess">
+<button onclick="guess()">Guess</button>
+
+<script>
+let id = null;
+let state = {};
+
+async function login(){
+  let r = await fetch("/login",{method:"POST"});
+  id = (await r.json()).id;
+}
+
+async function save(){
+  let deck = document.getElementById("deck")
+    .value.split("\n");
+  await fetch("/deck",{
+    method:"POST",
+    body:JSON.stringify({id,deck})
+  });
+}
+
+async function queue(){
+  await fetch("/queue",{
+    method:"POST",
+    body:JSON.stringify({id})
+  });
+}
+
+async function play(){
+  let r = await fetch("/play",{
+    method:"POST",
+    body:JSON.stringify({id})
+  });
+  let j = await r.json();
+  if(j.code) highlight(j.code);
+}
+
+async function guess(){
+  let g = document.getElementById("guess").value;
+  await fetch("/guess",{
+    method:"POST",
+    body:JSON.stringify({id,guess:g})
+  });
+}
+
+function highlight(code){
+  let c = code
+    .replace(/(\d+)/g,"<b>$1</b>")
+    .replace(/(\+|\-|\*|\/)/g,"<u>$1</u>")
+    .replace(/([a-zA-Z]+)/g,"<i>$1</i>");
+  document.getElementById("code").innerHTML = c;
+}
+
+async function update(){
+  if(!id) return;
+
+  let r = await fetch("/state?id="+id);
+  state = await r.json();
+
+  if(state.turn){
+    document.getElementById("turn").innerText =
+      state.turn == id ? "YOU" : "OPPONENT";
+
+    document.getElementById("time").innerText =
+      state.time[id];
+  }
+
+  if(state.code && state.last != id){
+    highlight(state.code);
+  }
+}
+
+setInterval(update, 1000);
+</script>
+
+</body>
+</html>
