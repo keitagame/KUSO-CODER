@@ -23,32 +23,33 @@ Time: <span id="time"></span><br>
 <button onclick="guess()">Guess</button>
 
 <script>
+let server = "";
 let id = null;
 let state = {};
 
 async function login(){
-  let r = await fetch("/login",{method:"POST"});
+  let r = await fetch(server+"/login",{method:"POST"});
   id = (await r.json()).id;
 }
 
 async function save(){
   let deck = document.getElementById("deck")
     .value.split("\n");
-  await fetch("/deck",{
+  await fetch(server+"/deck",{
     method:"POST",
     body:JSON.stringify({id,deck})
   });
 }
 
 async function queue(){
-  await fetch("/queue",{
+  await fetch(server+"/queue",{
     method:"POST",
     body:JSON.stringify({id})
   });
 }
 
 async function play(){
-  let r = await fetch("/play",{
+  let r = await fetch(server+"/play",{
     method:"POST",
     body:JSON.stringify({id})
   });
@@ -58,7 +59,7 @@ async function play(){
 
 async function guess(){
   let g = document.getElementById("guess").value;
-  await fetch("/guess",{
+  await fetch(server+"/guess",{
     method:"POST",
     body:JSON.stringify({id,guess:g})
   });
@@ -75,7 +76,7 @@ function highlight(code){
 async function update(){
   if(!id) return;
 
-  let r = await fetch("/state?id="+id);
+  let r = await fetch(server+"/state?id="+id);
   state = await r.json();
 
   if(state.turn){
