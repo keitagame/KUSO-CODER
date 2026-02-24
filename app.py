@@ -67,6 +67,23 @@ threading.Thread(target=timer_loop, daemon=True).start()
 # HTTP
 # =====================
 class Handler(http.server.BaseHTTPRequestHandler):
+    
+    def _set_cors(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self._set_cors()
+        self.end_headers()
+
+    def reply(self, obj):
+        self.send_response(200)
+        self._set_cors()
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps(obj).encode())
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
@@ -141,11 +158,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
             return self.reply(matches[mid])
 
-    def reply(self, obj):
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(json.dumps(obj).encode())
 
 
 print("Server: http://localhost:8080")
