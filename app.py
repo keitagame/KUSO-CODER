@@ -10,41 +10,61 @@ matches = {}
 # =====================
 HTML = """
 <!DOCTYPE html>
-
-    <html lang="ja">
+<html lang="ja">
 <head>
 <meta charset="utf-8">
-
+<title>クソコードバトラーズ</title>
 <style>
-body{font-family:sans-serif}
-
-
+body{font-family:sans-serif;margin:20px;}
+textarea{width:100%;max-width:600px;}
+button{margin:2px;}
+#code{background:#f5f5f5;padding:8px;min-height:40px;}
+#log{border:1px solid #ccc;height:200px;overflow-y:auto;padding:4px;background:#fafafa;}
+.status-box{padding:4px 8px;border-radius:4px;display:inline-block;margin-bottom:8px;}
+.status-wait{background:#ffeeba;}
+.status-play{background:#c3e6cb;}
+.status-end{background:#f5c6cb;}
+.score{font-weight:bold;}
 </style>
 </head>
 <body>
 
 <h2>クソコードバトラーズ</h2>
-<p>pythonでクソコードを組んで相手を惑わそう</p>
-<p>時間以内に出力を当てて、勝とう</p>
-<button onclick="login()">入場</button>
-<button onclick="queue()">マッチング</button>
-<button onclick="play()">スタート</button>
+<p>pythonでクソコードを組んで相手を惑わそう。<br>
+時間以内に出力を当てて、先にポイントを取った方が勝ち！</p>
 
-<h3>デッキ</h3>
-<textarea id="deck" rows="8" cols="50"></textarea>
-<br><button onclick="save()">セーブ</button>
+<div>
+  <button onclick="login()">入場</button>
+  <button onclick="queueMatch()">マッチング</button>
+  <button onclick="play()">スタート（自分のターンでコードを出す）</button>
+</div>
+
+<h3>デッキ（1行1コード・最大10枚）</h3>
+<textarea id="deck" rows="8" cols="60"
+placeholder="例: 1+1
+round(3.14159,2)
+max(1,2,3)
+math.sin(1)
+abs(-123)
+"></textarea>
+<br>
+<button onclick="save()">セーブ</button>
 
 <h3>Status</h3>
-<div id="status">Not logged in</div>
+<div id="status" class="status-box status-wait">Not logged in</div>
 
-<h3>Turn</h3>
-YOU: <span id="mytime"></span> |
-OPP: <span id="opptime"></span>
+<h3>Turn / Time</h3>
+<div>YOU: <span id="mytime">-</span> 秒 |
+OPP: <span id="opptime">-</span> 秒</div>
+
+<h3>Score</h3>
+<div>YOU: <span id="myscore" class="score">0</span> |
+OPP: <span id="oppscore" class="score">0</span></div>
 
 <h3>Code</h3>
 <pre id="code"></pre>
 
-<input id="guess">
+<input id="guess" placeholder="出力を予想して入力">
 <button onclick="guess()">Guess</button>
 
 <h3>Log</h3>
@@ -55,87 +75,142 @@ let id=null,state={};
 
 function log(s){
   let l=document.getElementById("log");
-  l.innerHTML+=s+"<br>";
+  let t=new Date().toLocaleTimeString();
+  l.innerHTML+="["+t+"] "+s+"<br>";
   l.scrollTop=l.scrollHeight;
 }
 
+function setStatus(text, cls){
+  let el=document.getElementById("status");
+  el.innerText=text;
+  el.className="status-box "+cls;
+}
+
 async function login(){
- let r=await fetch("/login",{method:"POST"});
- id=(await r.json()).id;
- log("login "+id);
+  let r=await fetch("/login",{method:"POST"});
+  let j=await r.json();
+  id=j.id;
+  log("login "+id);
+  setStatus("ログイン済み: "+id,"status-wait");
 }
 
 async function save(){
- let deck=document.getElementById("deck").value.split("\\n");
- await fetch("/deck",{method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({id,deck})
- });
- log("deck saved");
+  if(!id){log("先に入場してください");return;}
+  let deck=document.getElementById("deck").value
+    .split("\\n")
+    .map(x=>x.trim())
+    .filter(x=>x);
+  await fetch("/deck",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id,deck})
+  });
+  log("deck saved ("+deck.length+"枚)");
 }
 
-async function queue(){
- await fetch("/queue",{method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({id})
- });
- log("queue...");
+async function queueMatch(){
+  if(!id){log("先に入場してください");return;}
+  await fetch("/queue",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id})
+  });
+  log("queue...");
+  setStatus("マッチング待ち...","status-wait");
 }
 
 async function play(){
- let r=await fetch("/play",{method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({id})
- });
- let j=await r.json();
- if(j.code){highlight(j.code);log("your turn");}
- if(j.error)log(j.error);
+  if(!id){log("先に入場してください");return;}
+  let r=await fetch("/play",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id})
+  });
+  let j=await r.json();
+  if(j.code){
+    highlight(j.code);
+    log("あなたのターン: コードを出しました");
+  }
+  if(j.error)log("play error: "+j.error);
 }
 
 async function guess(){
- let g=document.getElementById("guess").value;
- let r=await fetch("/guess",{method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({id,guess:g})
- });
- let j=await r.json();
- log(JSON.stringify(j));
+  if(!id){log("先に入場してください");return;}
+  let g=document.getElementById("guess").value;
+  if(!g){log("guessを入力してください");return;}
+  let r=await fetch("/guess",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({id,guess:g})
+  });
+  let j=await r.json();
+  if(j.error){
+    log("guess error: "+j.error);
+    return;
+  }
+  if(j.correct){
+    log("正解！ あなたに1ポイント");
+  }else{
+    log("不正解... 残り時間が減りました");
+  }
 }
 
 function highlight(code){
- let c=code
-  .replace(/(\\d+)/g,"<b>$1</b>")
-  .replace(/(\\+|\\-|\\*|\\/)/g,"<u>$1</u>");
- document.getElementById("code").innerHTML=c;
+  let c=code
+    .replace(/(\\d+)/g,"<b>$1</b>")
+    .replace(/(\\+|\\-|\\*|\\/)/g,"<u>$1</u>");
+  document.getElementById("code").innerHTML=c;
 }
 
 async function update(){
- if(!id)return;
- let r=await fetch("/state?id="+id);
- state=await r.json();
+  if(!id)return;
+  let r=await fetch("/state?id="+id);
+  let j=await r.json();
+  state=j;
 
- if(state.wait)document.getElementById("status").innerText="waiting";
+  if(!j || Object.keys(j).length===0){
+    setStatus("マッチなし / 待機中","status-wait");
+    return;
+  }
 
- if(state.turn){
-  document.getElementById("status").innerText=
-    state.turn==id?"YOUR TURN":"OPPONENT";
+  if(j.wait){
+    setStatus("マッチング待ち...","status-wait");
+    return;
+  }
 
-  document.getElementById("mytime").innerText=
-    state.time[id];
+  // ターン・時間
+  if(j.turn){
+    let myid=id;
+    let opp = (j.p1===myid)?j.p2:j.p1;
+    document.getElementById("mytime").innerText = j.time[myid] ?? "-";
+    document.getElementById("opptime").innerText = j.time[opp] ?? "-";
 
-  let opp=state.p1==id?state.p2:state.p1;
-  document.getElementById("opptime").innerText=
-    state.time[opp];
- }
+    if(j.turn===myid){
+      setStatus("あなたのターン","status-play");
+    }else{
+      setStatus("相手のターン","status-play");
+    }
+  }
 
- if(state.code && state.last!=id){
-   highlight(state.code);
-   log("opponent played");
- }
+  // スコア
+  if(j.score){
+    let myid=id;
+    let opp = (j.p1===myid)?j.p2:j.p1;
+    document.getElementById("myscore").innerText = j.score[myid] ?? 0;
+    document.getElementById("oppscore").innerText = j.score[opp] ?? 0;
+  }
 
- if(state.winner){
-   log("WINNER:"+state.winner);
- }
+  // コード更新
+  if(j.code && j.last!==id){
+    highlight(j.code);
+    log("相手がコードを出しました");
+  }
+
+  // 勝敗
+  if(j.winner){
+    if(j.winner===id){
+      log("WINNER: YOU");
+    }else{
+      log("WINNER: OPPONENT");
+    }
+    setStatus("ゲーム終了","status-end");
+  }
 }
 setInterval(update,1000);
 </script>
@@ -157,7 +232,7 @@ SAFE = {
 def run_code(code):
     try:
         return str(eval(code, {"__builtins__":None}, SAFE))
-    except:
+    except Exception:
         return "error"
 
 # =====================
@@ -165,118 +240,185 @@ def run_code(code):
 # =====================
 def matchmaking():
     while True:
-        if len(queue)>=2:
-            p1=queue.pop(0)
-            p2=queue.pop(0)
+        if len(queue) >= 2:
+            p1 = queue.pop(0)
+            p2 = queue.pop(0)
 
-            mid=str(uuid.uuid4())
-            matches[mid]={
-                "p1":p1,"p2":p2,
-                "time":{p1:60,p2:60},
-                "turn":random.choice([p1,p2]),
-                "code":None,
-                "answer":None,
-                "last":None,
-                "winner":None
+            mid = str(uuid.uuid4())
+            matches[mid] = {
+                "p1": p1,
+                "p2": p2,
+                "time": {p1: 60, p2: 60},
+                "turn": random.choice([p1, p2]),
+                "code": None,
+                "answer": None,
+                "last": None,
+                "winner": None,
+                "score": {p1: 0, p2: 0},  # スコア追加
+                "max_score": 3,           # 先取ポイント
             }
-            players[p1]["match"]=mid
-            players[p2]["match"]=mid
+            players[p1]["match"] = mid
+            players[p2]["match"] = mid
         time.sleep(1)
 
-threading.Thread(target=matchmaking,daemon=True).start()
+threading.Thread(target=matchmaking, daemon=True).start()
 
 # =====================
 # timer
 # =====================
 def timer():
     while True:
-        for m in matches.values():
-            if m["winner"]:continue
-            t=m["turn"]
-            m["time"][t]-=1
-            if m["time"][t]<=0:
-                m["winner"]=m["p1"] if t==m["p2"] else m["p2"]
+        for m in list(matches.values()):
+            if m.get("winner"):
+                continue
+            t = m.get("turn")
+            if not t:
+                continue
+            if t not in m["time"]:
+                continue
+            m["time"][t] -= 1
+            if m["time"][t] <= 0:
+                # 時間切れ: 相手の勝ち
+                loser = t
+                winner = m["p1"] if t == m["p2"] else m["p2"]
+                m["winner"] = winner
         time.sleep(1)
 
-threading.Thread(target=timer,daemon=True).start()
+threading.Thread(target=timer, daemon=True).start()
 
 # =====================
 # HTTP
 # =====================
 class H(http.server.BaseHTTPRequestHandler):
 
-    def reply(self,x):
-        self.send_response(200)
-        self.send_header("Content-Type","application/json")
+    def reply(self, x, status=200, ctype="application/json"):
+        self.send_response(status)
+        self.send_header("Content-Type", ctype)
         self.end_headers()
-        self.wfile.write(json.dumps(x).encode())
+        if ctype == "application/json":
+            self.wfile.write(json.dumps(x).encode())
+        else:
+            self.wfile.write(x.encode())
 
     def do_GET(self):
-        if self.path=="/":
-            self.send_response(200)
-            self.send_header("Content-Type","text/html")
-            self.end_headers()
-            self.wfile.write(HTML.encode());return
+        if self.path == "/":
+            self.reply(HTML, ctype="text/html")
+            return
 
         if self.path.startswith("/state"):
-            pid=self.path.split("=")[1]
-            if pid not in players:return self.reply({})
-            mid=players[pid]["match"]
-            if not mid:return self.reply({"wait":1})
+            parts = self.path.split("?",1)
+            if len(parts) == 1:
+                return self.reply({})
+            qs = parts[1]
+            if "=" not in qs:
+                return self.reply({})
+            pid = qs.split("=",1)[1]
+            if pid not in players:
+                return self.reply({})
+            mid = players[pid].get("match")
+            if not mid or mid not in matches:
+                return self.reply({"wait": 1})
             return self.reply(matches[mid])
 
+        # その他は404
+        self.reply({"error":"not found"}, status=404)
+
     def do_POST(self):
-        l=int(self.headers.get("Content-Length",0))
-        d=json.loads(self.rfile.read(l) or "{}")
+        l = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(l) if l>0 else b"{}"
+        try:
+            d = json.loads(raw or "{}")
+        except Exception:
+            d = {}
 
-        if self.path=="/login":
-            pid=str(uuid.uuid4())
-            players[pid]={"deck":[],"match":None}
-            return self.reply({"id":pid})
+        path = self.path
 
-        if self.path=="/deck":
-            players[d["id"]]["deck"]=d["deck"][:10]
-            return self.reply({"ok":1})
+        if path == "/login":
+            pid = str(uuid.uuid4())
+            players[pid] = {"deck": [], "match": None}
+            return self.reply({"id": pid})
 
-        if self.path=="/queue":
-            if d["id"] not in queue:
-                queue.append(d["id"])
-            return self.reply({"ok":1})
+        if path == "/deck":
+            pid = d.get("id")
+            if pid not in players:
+                return self.reply({"error":"invalid id"})
+            deck = d.get("deck") or []
+            deck = [str(x) for x in deck][:10]
+            players[pid]["deck"] = deck
+            return self.reply({"ok": 1})
 
-        if self.path=="/play":
-            pid=d["id"]
-            mid=players[pid]["match"]
-            if not mid:return self.reply({"error":"no match"})
-            m=matches[mid]
+        if path == "/queue":
+            pid = d.get("id")
+            if pid not in players:
+                return self.reply({"error":"invalid id"})
+            if pid not in queue and players[pid].get("match") is None:
+                queue.append(pid)
+            return self.reply({"ok": 1})
 
-            if m["winner"]:
-                return self.reply({"error":"finished"})
+        if path == "/play":
+            pid = d.get("id")
+            if pid not in players:
+                return self.reply({"error":"invalid id"})
+            mid = players[pid].get("match")
+            if not mid or mid not in matches:
+                return self.reply({"error": "no match"})
+            m = matches[mid]
 
-            if m["turn"]!=pid:
-                return self.reply({"error":"not turn"})
+            if m.get("winner"):
+                return self.reply({"error": "finished"})
+
+            if m.get("turn") != pid:
+                return self.reply({"error": "not turn"})
 
             if not players[pid]["deck"]:
-                return self.reply({"error":"deck empty"})
+                return self.reply({"error": "deck empty"})
 
-            code=random.choice(players[pid]["deck"])
-            m["code"]=code
-            m["answer"]=run_code(code)
-            m["last"]=pid
+            code = random.choice(players[pid]["deck"])
+            m["code"] = code
+            m["answer"] = run_code(code)
+            m["last"] = pid
 
-            m["turn"]=m["p2"] if pid==m["p1"] else m["p1"]
-            return self.reply({"code":code})
+            # ターン交代
+            m["turn"] = m["p2"] if pid == m["p1"] else m["p1"]
+            return self.reply({"code": code})
 
-        if self.path=="/guess":
-            pid=d["id"]
-            mid=players[pid]["match"]
-            m=matches[mid]
+        if path == "/guess":
+            pid = d.get("id")
+            if pid not in players:
+                return self.reply({"error":"invalid id"})
+            mid = players[pid].get("match")
+            if not mid or mid not in matches:
+                return self.reply({"error":"no match"})
+            m = matches[mid]
 
-            if d["guess"]==m["answer"]:
-                m["winner"]=pid
-                return self.reply({"correct":1})
+            if m.get("winner"):
+                return self.reply({"error":"finished"})
+
+            if not m.get("answer"):
+                return self.reply({"error":"no code to guess"})
+
+            g = str(d.get("guess",""))
+            if g == m["answer"]:
+                # 正解: スコア加算
+                m["score"][pid] = m["score"].get(pid,0) + 1
+                # 勝利条件
+                if m["score"][pid] >= m.get("max_score",3):
+                    m["winner"] = pid
+                # 次のターンは相手
+                m["turn"] = m["p2"] if pid == m["p1"] else m["p1"]
+                return self.reply({"correct":1,"score":m["score"][pid]})
             else:
-                m["time"][pid]-=5
+                # 不正解: 時間ペナルティ
+                if pid in m["time"]:
+                    m["time"][pid] -= 5
+                    if m["time"][pid] <= 0:
+                        # 時間切れで相手勝ち
+                        opp = m["p1"] if pid == m["p2"] else m["p2"]
+                        m["winner"] = opp
                 return self.reply({"correct":0})
 
+        # その他
+        self.reply({"error":"not found"}, status=404)
+
 print("http://localhost:8080")
-http.server.HTTPServer(("0.0.0.0",8080),H).serve_forever()
+http.server.HTTPServer(("0.0.0.0",8080), H).serve_forever()
