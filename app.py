@@ -10,26 +10,29 @@ matches = {}
 # =====================
 HTML = """
 <!DOCTYPE html>
-<html>
+
+    <html lang="ja">
 <head>
 <meta charset="utf-8">
+
 <style>
 body{font-family:sans-serif}
-#log{background:#111;color:#0f0;padding:10px;height:200px;overflow:auto}
-#code{background:#222;color:#fff;padding:10px}
+
+
 </style>
 </head>
 <body>
 
-<h2>Code Battle</h2>
+<h2>クソコードバトラーズ</h2>
+<p>pythonでクソコードを組んで相手を惑わそう</p>
+<p>時間以内に出力を当てて、勝とう</p>
+<button onclick="login()">入場</button>
+<button onclick="queue()">マッチング</button>
+<button onclick="play()">スタート</button>
 
-<button onclick="login()">Login</button>
-<button onclick="queue()">Match</button>
-<button onclick="play()">Play</button>
-
-<h3>Deck</h3>
+<h3>デッキ</h3>
 <textarea id="deck" rows="8" cols="50"></textarea>
-<br><button onclick="save()">Save</button>
+<br><button onclick="save()">セーブ</button>
 
 <h3>Status</h3>
 <div id="status">Not logged in</div>
