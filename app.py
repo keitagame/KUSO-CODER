@@ -11,6 +11,114 @@ queue = []
 matches = {}
 
 # =====================
+# HTML（埋め込み）
+# =====================
+HTML = """
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>クソコーダー</h2>
+
+<button onclick="login()">Login</button>
+<button onclick="queue()">Match</button>
+<button onclick="play()">Play</button>
+
+<h3>Deck（1行1カード）</h3>
+<textarea id="deck" rows="10" cols="50"></textarea>
+<br>
+<button onclick="save()">Save Deck</button>
+
+<h3>Game</h3>
+Turn: <span id="turn"></span><br>
+Time: <span id="time"></span><br>
+
+<pre id="code"></pre>
+
+<input id="guess">
+<button onclick="guess()">Guess</button>
+
+<script>
+let id = null;
+let state = {};
+
+async function login(){
+  let r = await fetch("/login",{method:"POST"});
+  id = (await r.json()).id;
+}
+
+async function save(){
+  let deck = document.getElementById("deck")
+    .value.split("\\n");
+  await fetch("/deck",{
+    method:"POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({id,deck})
+  });
+}
+
+async function queue(){
+  await fetch("/queue",{
+    method:"POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({id})
+  });
+}
+
+async function play(){
+  let r = await fetch("/play",{
+    method:"POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({id})
+  });
+  let j = await r.json();
+  if(j.code) highlight(j.code);
+}
+
+async function guess(){
+  let g = document.getElementById("guess").value;
+  await fetch("/guess",{
+    method:"POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({id,guess:g})
+  });
+}
+
+function highlight(code){
+  let c = code
+    .replace(/(\\d+)/g,"<b>$1</b>")
+    .replace(/(\\+|\\-|\\*|\\/)/g,"<u>$1</u>")
+    .replace(/([a-zA-Z]+)/g,"<i>$1</i>");
+  document.getElementById("code").innerHTML = c;
+}
+
+async function update(){
+  if(!id) return;
+
+  let r = await fetch("/state?id="+id);
+  state = await r.json();
+
+  if(state.turn){
+    document.getElementById("turn").innerText =
+      state.turn == id ? "YOU" : "OPPONENT";
+
+    document.getElementById("time").innerText =
+      state.time[id];
+  }
+
+  if(state.code && state.last != id){
+    highlight(state.code);
+  }
+}
+
+setInterval(update, 1000);
+</script>
+
+</body>
+</html>
+"""
+
+# =====================
 # 安全コード実行
 # =====================
 def run_code(code):
@@ -67,50 +175,53 @@ threading.Thread(target=timer_loop, daemon=True).start()
 # HTTP
 # =====================
 class Handler(http.server.BaseHTTPRequestHandler):
-    
-    def _set_cors(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self._set_cors()
-        self.end_headers()
 
     def reply(self, obj):
         self.send_response(200)
-        self._set_cors()
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps(obj).encode())
+
+    def do_GET(self):
+        if self.path == "/" or self.path == "/index.html":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(HTML.encode())
+            return
+
+        if self.path.startswith("/state"):
+            pid = self.path.split("=")[1]
+            mid = players.get(pid, {}).get("match")
+
+            if not mid:
+                return self.reply({"state": "waiting"})
+
+            return self.reply(matches[mid])
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
         data = json.loads(self.rfile.read(length) or "{}")
 
-        # Login
         if self.path == "/login":
             pid = str(uuid.uuid4())
-            players[pid] = {
-                "deck": [],
-                "match": None
-            }
+            players[pid] = {"deck": [], "match": None}
             return self.reply({"id": pid})
 
-        # Deck
         if self.path == "/deck":
-            pid = data["id"]
-            deck = data["deck"][:10]
-            players[pid]["deck"] = deck
+            pid = data.get("id")
+            deck = data.get("deck")
+            if not pid or pid not in players:
+                return self.reply({"error": "invalid id"})
+            if not isinstance(deck, list):
+                return self.reply({"error": "invalid deck"})
+            players[pid]["deck"] = deck[:10]
             return self.reply({"ok": True})
 
-        # Queue
         if self.path == "/queue":
             queue.append(data["id"])
             return self.reply({"ok": True})
 
-        # Play card
         if self.path == "/play":
             pid = data["id"]
             mid = players[pid]["match"]
@@ -123,22 +234,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self.reply({"error": "empty deck"})
 
             code = random.choice(players[pid]["deck"])
-
             m["code"] = code
             m["answer"] = run_code(code)
             m["last"] = pid
-
-            m["turn"] = (
-                m["p2"] if pid == m["p1"] else m["p1"]
-            )
+            m["turn"] = m["p2"] if pid == m["p1"] else m["p1"]
 
             return self.reply({"code": code})
 
-        # Guess
         if self.path == "/guess":
             pid = data["id"]
             guess = str(data["guess"])
-
             mid = players[pid]["match"]
             m = matches[mid]
 
@@ -147,17 +252,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             else:
                 m["time"][pid] -= 5
                 return self.reply({"correct": False})
-
-    def do_GET(self):
-        if self.path.startswith("/state"):
-            pid = self.path.split("=")[1]
-            mid = players.get(pid, {}).get("match")
-
-            if not mid:
-                return self.reply({"state": "waiting"})
-
-            return self.reply(matches[mid])
-
 
 
 print("Server: http://localhost:8080")
