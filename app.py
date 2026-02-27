@@ -75,8 +75,8 @@ class GameRoom:
     def tick(self, pid):
         p = self.players[pid]
         now = time.time()
-        if p["current_code"]:
-            p["time_left"] = max(0, p["time_left"] - (now - p["last_tick"]))
+        # ゲーム中は常にタイマーを減らす（コード選択中かどうかに関わらず）
+        p["time_left"] = max(0, p["time_left"] - (now - p["last_tick"]))
         p["last_tick"] = now
         return p["time_left"]
 
