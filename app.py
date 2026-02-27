@@ -1,389 +1,301 @@
 #!/usr/bin/env python3
-import http.server, json, uuid, threading, time, random, math
+"""クソコードバトル - 標準ライブラリのみ"""
 
-players = {}
-queue = []
-matches = {}
+import json, random, time, uuid, hashlib, struct, base64, threading
+from http.server import BaseHTTPRequestHandler
+from urllib.parse import urlparse
+import socketserver
 
-# =====================
-# HTML
-# =====================
-HTML = """
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<title>クソコードバトラーズ</title>
-<style>
-body{font-family:sans-serif;margin:20px;}
-textarea{width:100%;max-width:600px;}
-button{margin:2px;}
-#code{background:#f5f5f5;padding:8px;min-height:40px;}
-#log{border:1px solid #ccc;height:200px;overflow-y:auto;padding:4px;background:#fafafa;}
-.status-box{padding:4px 8px;border-radius:4px;display:inline-block;margin-bottom:8px;}
-.status-wait{background:#ffeeba;}
-.status-play{background:#c3e6cb;}
-.status-end{background:#f5c6cb;}
-.score{font-weight:bold;}
-</style>
-</head>
-<body>
+KUSO_CODES = [
+    {"id": "k001", "title": "謎の計算", "code": "_ = lambda __, ___, ____, _____: __ + ___ * ____ - _____\nprint(_( 1 , 2 , 3 , 1 ))", "answer": "6", "hint": "ラムダ式で計算している", "difficulty": 1, "tags": ["lambda", "math"]},
+    {"id": "k002", "title": "文字の呪い", "code": "x=''.join(chr(ord(c)-32) if 96<ord(c)<123 else chr(ord(c)+32) if 64<ord(c)<91 else c for c in 'hELLO wORLD')\nprint(x)", "answer": "Hello World", "hint": "大文字小文字を操作している", "difficulty": 2, "tags": ["string", "ord"]},
+    {"id": "k003", "title": "フィボ地獄", "code": "f=lambda n:n if n<2 else f(n-1)+f(n-2)\nprint(f(7))", "answer": "13", "hint": "有名なアルゴリズムの再帰", "difficulty": 2, "tags": ["recursion", "fibonacci"]},
+    {"id": "k004", "title": "リスト錬金術", "code": "l=[i**2 for i in range(1,6)]\nprint(sum(l[::2]))", "answer": "35", "hint": "スライスと内包表記", "difficulty": 3, "tags": ["list", "comprehension"]},
+    {"id": "k005", "title": "真理の海", "code": "print(int(True)+int(True)+int(False)+int(True)*3)", "answer": "5", "hint": "Boolは整数", "difficulty": 1, "tags": ["bool", "int"]},
+    {"id": "k006", "title": "文字列の呪縛", "code": 's = "abcdefg"\nprint(s[len(s)//2::] + s[:len(s)//2])', "answer": "defgabc", "hint": "スライスの結合", "difficulty": 3, "tags": ["string", "slice"]},
+    {"id": "k007", "title": "辞書の迷宮", "code": "d={str(i):i*i for i in range(5)}\nprint(d.get('3',0)+d.get('4',0))", "answer": "25", "hint": "辞書内包表記とget", "difficulty": 3, "tags": ["dict", "comprehension"]},
+    {"id": "k008", "title": "ビット遊び", "code": "x = 0b1010\ny = 0b1100\nprint(x & y, x | y, x ^ y)", "answer": "8 14 6", "hint": "ビット演算子 AND OR XOR", "difficulty": 4, "tags": ["bitwise", "binary"]},
+    {"id": "k009", "title": "ゼータもどき", "code": "import functools\nr = functools.reduce(lambda a,b:a+b, map(lambda x:1/x**2, range(1,6)))\nprint(round(r,4))", "answer": "1.4636", "hint": "1/n^2の和を計算", "difficulty": 4, "tags": ["math", "reduce"]},
+    {"id": "k010", "title": "逆順の秘密", "code": 'words = "python is fun"\nprint(\' \'.join(word[::-1] for word in words.split()))', "answer": "nohtyp si nuf", "hint": "各単語を逆にする", "difficulty": 2, "tags": ["string", "slice"]},
+    {"id": "k011", "title": "モジュロ地獄", "code": "print([x for x in range(50) if x%3==0 and x%5==0][-1])", "answer": "45", "hint": "FizzBuzz的なフィルタ", "difficulty": 3, "tags": ["modulo", "list"]},
+    {"id": "k012", "title": "入れ子の罠", "code": "f = lambda x: (lambda y: y*y)(x+1)\nprint(f(4))", "answer": "25", "hint": "ネストされたラムダ", "difficulty": 3, "tags": ["lambda", "closure"]},
+    {"id": "k013", "title": "謎のzip", "code": "a = [1,2,3,4,5]\nb = [10,20,30,40,50]\nprint(sum(x*y for x,y in zip(a,b)))", "answer": "550", "hint": "内積の計算", "difficulty": 3, "tags": ["zip", "math"]},
+    {"id": "k014", "title": "型変換マジック", "code": 'x = "3.14"\ny = "2"\nprint(int(float(x) * int(y)))', "answer": "6", "hint": "型変換の連鎖", "difficulty": 2, "tags": ["type", "conversion"]},
+    {"id": "k015", "title": "セット遊び", "code": "a = {1,2,3,4,5}\nb = {3,4,5,6,7}\nprint(len(a^b), sum(a&b))", "answer": "4 12", "hint": "集合の対称差と積集合", "difficulty": 4, "tags": ["set", "math"]},
+    {"id": "k016", "title": "スター展開", "code": "first, *rest = [1, 2, 3, 4, 5]\n*init, last = rest\nprint(first + last)", "answer": "5", "hint": "アンパック代入", "difficulty": 3, "tags": ["unpack", "star"]},
+    {"id": "k017", "title": "条件式の洞窟", "code": "x = 10\ny = x if x > 5 else x * 2 if x > 2 else 0\nprint(y)", "answer": "10", "hint": "三項演算子のネスト", "difficulty": 2, "tags": ["ternary", "condition"]},
+    {"id": "k018", "title": "文字カウント", "code": 'from collections import Counter\nc = Counter("mississippi")\nprint(c.most_common(1)[0][1])', "answer": "4", "hint": "最頻出文字の出現回数", "difficulty": 3, "tags": ["counter", "string"]},
+    {"id": "k019", "title": "謎のmap", "code": "nums = [1, -2, 3, -4, 5]\nprint(list(map(abs, nums)))", "answer": "[1, 2, 3, 4, 5]", "hint": "absをmapで適用", "difficulty": 1, "tags": ["map", "abs"]},
+    {"id": "k020", "title": "ウォルラス演算子", "code": "data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\nif (n := len(data)) > 5:\n    print(n * 2)", "answer": "20", "hint": "セイウチ演算子 :=", "difficulty": 3, "tags": ["walrus", "operator"]},
+]
 
-<h2>クソコードバトラーズ</h2>
-<p>pythonでクソコードを組んで相手を惑わそう。<br>
-ターンが来たら自動でコードが出され、相手が答えるゲームです。</p>
+waiting_players = []
+active_games = {}
+player_connections = {}
+global_lock = threading.Lock()
+WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
-<div>
-  <button onclick="login()">入場</button>
-  <button onclick="queueMatch()">マッチング</button>
-</div>
+class GameRoom:
+    def __init__(self, gid, p1id, p1name, p2id, p2name):
+        self.game_id = gid
+        self.player1_id = p1id
+        self.player2_id = p2id
+        self.players = {
+            p1id: {"name": p1name, "time_left": 60.0, "score": 0, "deck": [], "hand": [], "solved": [], "current_code": None, "last_tick": time.time()},
+            p2id: {"name": p2name, "time_left": 60.0, "score": 0, "deck": [], "hand": [], "solved": [], "current_code": None, "last_tick": time.time()},
+        }
+        self.finished = False
+        self.winner = None
 
-<h3>デッキ（1行1コード・最大10枚）</h3>
-<textarea id="deck" rows="8" cols="60"
-placeholder="例: 1+1
-round(3.14159,2)
-max(1,2,3)
-math.sin(1)
-abs(-123)
-"></textarea>
-<br>
-<button onclick="save()">セーブ</button>
+    def opp(self, pid):
+        return self.player2_id if pid == self.player1_id else self.player1_id
 
-<h3>Status</h3>
-<div id="status" class="status-box status-wait">Not logged in</div>
+    def build_deck(self, pid):
+        deck = random.sample(KUSO_CODES, min(10, len(KUSO_CODES)))
+        self.players[pid]["deck"] = [c["id"] for c in deck]
+        self.draw_hand(pid, 3)
 
-<h3>Turn / Time</h3>
-<div>YOU: <span id="mytime">-</span> 秒 |
-OPP: <span id="opptime">-</span> 秒</div>
+    def draw_hand(self, pid, n=1):
+        p = self.players[pid]
+        for _ in range(n):
+            if p["deck"] and len(p["hand"]) < 5:
+                p["hand"].append(p["deck"].pop(0))
 
-<h3>Score</h3>
-<div>YOU: <span id="myscore" class="score">0</span> |
-OPP: <span id="oppscore" class="score">0</span></div>
+    def card(self, cid):
+        return next((c for c in KUSO_CODES if c["id"] == cid), None)
 
-<h3>Code</h3>
-<pre id="code"></pre>
+    def play_card(self, pid, cid):
+        p = self.players[pid]
+        if cid not in p["hand"]: return False
+        p["hand"].remove(cid)
+        p["current_code"] = cid
+        p["last_tick"] = time.time()
+        return True
 
-<input id="guess" placeholder="出力を予想して入力">
-<button onclick="guess()">Guess</button>
+    def tick(self, pid):
+        p = self.players[pid]
+        now = time.time()
+        if p["current_code"]:
+            p["time_left"] = max(0, p["time_left"] - (now - p["last_tick"]))
+        p["last_tick"] = now
+        return p["time_left"]
 
-<h3>Log</h3>
-<div id="log"></div>
+    def submit(self, pid, answer):
+        p = self.players[pid]
+        if not p["current_code"]: return {"correct": False, "message": "コードを選んでいません"}
+        c = self.card(p["current_code"])
+        if answer.strip() == c["answer"].strip():
+            p["score"] += 1
+            p["solved"].append(p["current_code"])
+            p["current_code"] = None
+            self.draw_hand(pid, 1)
+            return {"correct": True, "message": "正解！", "score": p["score"]}
+        return {"correct": False, "message": f"不正解... 正解は: {c['answer']}", "answer": c["answer"]}
 
-<script>
-let id=null,state={};
+    def check_over(self):
+        for pid, p in self.players.items():
+            if p["time_left"] <= 0:
+                self.finished = True
+                self.winner = self.opp(pid)
+                return True
+        return False
 
-function log(s){
-  let l=document.getElementById("log");
-  let t=new Date().toLocaleTimeString();
-  l.innerHTML+="["+t+"] "+s+"<br>";
-  l.scrollTop=l.scrollHeight;
-}
+    def state(self, pid):
+        oid = self.opp(pid)
+        me = self.players[pid]
+        opp = self.players[oid]
+        return {
+            "game_id": self.game_id,
+            "me": {"time_left": round(me["time_left"],1), "score": me["score"],
+                   "hand": [self.card(c) for c in me["hand"]], "hand_count": len(me["hand"]),
+                   "deck_count": len(me["deck"]), "current_code": self.card(me["current_code"]) if me["current_code"] else None,
+                   "solved_count": len(me["solved"])},
+            "opponent": {"time_left": round(opp["time_left"],1), "score": opp["score"],
+                         "hand_count": len(opp["hand"]), "deck_count": len(opp["deck"]),
+                         "solving": opp["current_code"] is not None, "solved_count": len(opp["solved"])},
+            "finished": self.finished, "winner": self.winner,
+        }
 
-function setStatus(text, cls){
-  let el=document.getElementById("status");
-  el.innerText=text;
-  el.className="status-box "+cls;
-}
+def find_room(pid):
+    return next((r for r in active_games.values() if pid in r.players), None)
 
-async function login(){
-  let r=await fetch("/login",{method:"POST"});
-  let j=await r.json();
-  id=j.id;
-  log("login "+id);
-  setStatus("ログイン済み: "+id,"status-wait");
-}
+class WS:
+    def __init__(self, sock, pid):
+        self.sock = sock; self.player_id = pid; self.closed = False
+        self._lock = threading.Lock()
 
-async function save(){
-  if(!id){log("先に入場してください");return;}
-  let deck=document.getElementById("deck").value
-    .split("\\n")
-    .map(x=>x.trim())
-    .filter(x=>x);
-  await fetch("/deck",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({id,deck})
-  });
-  log("deck saved ("+deck.length+"枚)");
-}
+    def send(self, obj):
+        if self.closed: return
+        data = json.dumps(obj, ensure_ascii=False).encode()
+        length = len(data)
+        hdr = bytearray([0x81])
+        if length < 126: hdr.append(length)
+        elif length < 65536: hdr += bytearray([126]) + struct.pack('>H', length)
+        else: hdr += bytearray([127]) + struct.pack('>Q', length)
+        with self._lock:
+            try: self.sock.sendall(bytes(hdr) + data)
+            except: self.closed = True
 
-async function queueMatch(){
-  if(!id){log("先に入場してください");return;}
-  await fetch("/queue",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({id})
-  });
-  log("queue...");
-  setStatus("マッチング待ち...","status-wait");
-}
-
-async function guess(){
-  if(!id){log("先に入場してください");return;}
-  let g=document.getElementById("guess").value;
-  if(!g){log("guessを入力してください");return;}
-  let r=await fetch("/guess",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({id,guess:g})
-  });
-  let j=await r.json();
-  if(j.error){
-    log("guess error: "+j.error);
-    return;
-  }
-  if(j.correct){
-    log("正解！ あなたに1ポイント");
-  }else{
-    log("不正解... 残り時間が減りました");
-  }
-}
-
-function highlight(code){
-  let c=code
-    .replace(/(\\d+)/g,"<b>$1</b>")
-    .replace(/(\\+|\\-|\\*|\\/)/g,"<u>$1</u>");
-  document.getElementById("code").innerHTML=c;
-}
-
-async function update(){
-  if(!id)return;
-  let r=await fetch("/state?id="+id);
-  let j=await r.json();
-  state=j;
-
-  if(!j || Object.keys(j).length===0){
-    setStatus("マッチなし / 待機中","status-wait");
-    return;
-  }
-
-  if(j.wait){
-    setStatus("マッチング待ち...","status-wait");
-    return;
-  }
-
-  // ターン・時間
-  if(j.turn){
-    let myid=id;
-    let opp = (j.p1===myid)?j.p2:j.p1;
-    document.getElementById("mytime").innerText = j.time[myid] ?? "-";
-    document.getElementById("opptime").innerText = j.time[opp] ?? "-";
-
-    if(j.turn===myid){
-      setStatus("あなたのターン（相手が答える）","status-play");
-    }else{
-      setStatus("相手のターン（あなたが答える）","status-play");
-    }
-  }
-
-  // スコア
-  if(j.score){
-    let myid=id;
-    let opp = (j.p1===myid)?j.p2:j.p1;
-    document.getElementById("myscore").innerText = j.score[myid] ?? 0;
-    document.getElementById("oppscore").innerText = j.score[opp] ?? 0;
-  }
-
-  // コード更新
-  if(j.code && j.last!==id){
-    highlight(j.code);
-    log("相手がコードを出しました");
-  }
-
-  // 勝敗
-  if(j.winner){
-    if(j.winner===id){
-      log("WINNER: YOU");
-    }else{
-      log("WINNER: OPPONENT");
-    }
-    setStatus("ゲーム終了","status-end");
-  }
-}
-setInterval(update,1000);
-</script>
-</body>
-</html>
-"""
-
-# =====================
-# 安全eval
-# =====================
-SAFE = {
-    "abs":abs,
-    "round":round,
-    "min":min,
-    "max":max,
-    "math":math
-}
-
-def run_code(code):
-    try:
-        return str(eval(code, {"__builtins__":None}, SAFE))
-    except Exception:
-        return "error"
-
-# =====================
-# 自動プレイ
-# =====================
-def auto_play(m):
-    pid = m["turn"]
-    deck = players[pid]["deck"]
-    if not deck:
-        m["winner"] = m["p2"] if pid == m["p1"] else m["p1"]
-        return
-
-    code = random.choice(deck)
-    m["code"] = code
-    m["answer"] = run_code(code)
-    m["last"] = pid
-
-# =====================
-# matchmaking
-# =====================
-def matchmaking():
-    while True:
-        if len(queue) >= 2:
-            p1 = queue.pop(0)
-            p2 = queue.pop(0)
-
-            mid = str(uuid.uuid4())
-            matches[mid] = {
-                "p1": p1,
-                "p2": p2,
-                "time": {p1: 60, p2: 60},
-                "turn": random.choice([p1, p2]),
-                "code": None,
-                "answer": None,
-                "last": None,
-                "winner": None,
-                "score": {p1: 0, p2: 0},
-                "max_score": 3,
-            }
-            players[p1]["match"] = mid
-            players[p2]["match"] = mid
-        time.sleep(1)
-
-threading.Thread(target=matchmaking, daemon=True).start()
-
-# =====================
-# timer
-# =====================
-def timer():
-    while True:
-        for m in list(matches.values()):
-            if m.get("winner"):
-                continue
-
-            t = m["turn"]
-            m["time"][t] -= 1
-            if m["time"][t] <= 0:
-                loser = t
-                winner = m["p1"] if t == m["p2"] else m["p2"]
-                m["winner"] = winner
-                continue
-
-            # ★ 自動プレイ：コードがまだ出ていない時だけ
-            if m["code"] is None:
-                auto_play(m)
-
-        time.sleep(1)
-
-threading.Thread(target=timer, daemon=True).start()
-
-# =====================
-# HTTP
-# =====================
-class H(http.server.BaseHTTPRequestHandler):
-
-    def reply(self, x, status=200, ctype="application/json"):
-        self.send_response(status)
-        self.send_header("Content-Type", ctype)
-        self.end_headers()
-        if ctype == "application/json":
-            self.wfile.write(json.dumps(x).encode())
-        else:
-            self.wfile.write(x.encode())
-
-    def do_GET(self):
-        if self.path == "/":
-            self.reply(HTML, ctype="text/html")
-            return
-
-        if self.path.startswith("/state"):
-            pid = self.path.split("=")[1]
-            if pid not in players:
-                return self.reply({})
-            mid = players[pid].get("match")
-            if not mid or mid not in matches:
-                return self.reply({"wait": 1})
-            return self.reply(matches[mid])
-
-        self.reply({"error":"not found"}, status=404)
-
-    def do_POST(self):
-        l = int(self.headers.get("Content-Length", 0))
-        raw = self.rfile.read(l) if l>0 else b"{}"
+    def recv(self):
         try:
-            d = json.loads(raw or "{}")
-        except Exception:
-            d = {}
+            def rb(n):
+                b = b''
+                while len(b) < n:
+                    c = self.sock.recv(n-len(b))
+                    if not c: raise ConnectionError()
+                    b += c
+                return b
+            h = rb(2)
+            op = h[0] & 0xF
+            masked = bool(h[1] & 0x80)
+            length = h[1] & 0x7F
+            if length == 126: length = struct.unpack('>H', rb(2))[0]
+            elif length == 127: length = struct.unpack('>Q', rb(8))[0]
+            mask = rb(4) if masked else b''
+            payload = bytearray(rb(length))
+            if masked:
+                for i in range(len(payload)): payload[i] ^= mask[i%4]
+            return op, bytes(payload)
+        except: return None, None
 
-        path = self.path
+    def close(self):
+        self.closed = True
+        try: self.sock.sendall(bytes([0x88, 0x00]))
+        except: pass
+        try: self.sock.close()
+        except: pass
 
-        if path == "/login":
-            pid = str(uuid.uuid4())
-            players[pid] = {"deck": [], "match": None}
-            return self.reply({"id": pid})
 
-        if path == "/deck":
-            pid = d.get("id")
-            if pid not in players:
-                return self.reply({"error":"invalid id"})
-            deck = d.get("deck") or []
-            deck = [str(x) for x in deck][:10]
-            players[pid]["deck"] = deck
-            return self.reply({"ok": 1})
+def handle_msg(ws, pid, data):
+    t = data.get("type")
+    if t == "ping": ws.send({"type": "pong"})
+    elif t == "find_match": do_find_match(ws, pid, data.get("username","PLAYER"))
+    elif t == "play_card": do_play_card(ws, pid, data.get("card_id"))
+    elif t == "submit_answer": do_submit(ws, pid, data.get("answer",""))
+    elif t == "tick": do_tick(pid)
+    elif t == "cancel_match": do_cancel(pid)
 
-        if path == "/queue":
-            pid = d.get("id")
-            if pid not in players:
-                return self.reply({"error":"invalid id"})
-            if pid not in queue and players[pid].get("match") is None:
-                queue.append(pid)
-            return self.reply({"ok": 1})
+def do_find_match(ws, pid, username):
+    to_start = None
+    with global_lock:
+        if find_room(pid): return
+        if any(p["id"]==pid for p in waiting_players): return
+        waiting_players.append({"id": pid, "username": username})
+        ws.send({"type": "waiting"})
+        if len(waiting_players) >= 2:
+            p1 = waiting_players.pop(0)
+            p2 = waiting_players.pop(0)
+            to_start = (p1, p2)
+    if to_start: do_start(*to_start)
 
-        if path == "/guess":
-            pid = d.get("id")
-            if pid not in players:
-                return self.reply({"error":"invalid id"})
-            mid = players[pid].get("match")
-            if not mid or mid not in matches:
-                return self.reply({"error":"no match"})
-            m = matches[mid]
+def do_start(p1, p2):
+    gid = str(uuid.uuid4())[:8]
+    room = GameRoom(gid, p1["id"], p1["username"], p2["id"], p2["username"])
+    room.build_deck(p1["id"]); room.build_deck(p2["id"])
+    with global_lock: active_games[gid] = room
+    for pid, pinfo in [(p1["id"],p1),(p2["id"],p2)]:
+        ws = player_connections.get(pid)
+        opp = p2 if pid==p1["id"] else p1
+        if ws and not ws.closed:
+            ws.send({"type":"game_start","game_id":gid,"opponent_name":opp["username"],"state":room.state(pid)})
 
-            if m.get("winner"):
-                return self.reply({"error":"finished"})
+def do_play_card(ws, pid, cid):
+    room = find_room(pid)
+    if not room: ws.send({"type":"error","message":"ゲームが見つかりません"}); return
+    if not room.play_card(pid, cid): ws.send({"type":"error","message":"そのカードを出せません"}); return
+    broadcast_state(room)
 
-            if not m.get("answer"):
-                return self.reply({"error":"no code to guess"})
+def do_submit(ws, pid, answer):
+    room = find_room(pid)
+    if not room: return
+    result = room.submit(pid, answer)
+    ws.send({"type":"answer_result",**result})
+    if room.check_over(): broadcast_over(room); return
+    broadcast_state(room)
 
-            g = str(d.get("guess","")).strip()
+def do_tick(pid):
+    room = find_room(pid)
+    if not room or room.finished: return
+    room.tick(pid)
+    if room.check_over(): broadcast_over(room); return
+    ws = player_connections.get(pid)
+    if ws and not ws.closed:
+        me = room.players[pid]; opp = room.players[room.opp(pid)]
+        ws.send({"type":"timer_update","my_time":round(me["time_left"],1),"opponent_time":round(opp["time_left"],1)})
 
-            if g == m["answer"]:
-                m["score"][pid] += 1
-                if m["score"][pid] >= m["max_score"]:
-                    m["winner"] = pid
+def do_cancel(pid):
+    with global_lock:
+        for i,p in enumerate(waiting_players):
+            if p["id"]==pid: waiting_players.pop(i); break
 
-                m["turn"] = m["p2"] if pid == m["p1"] else m["p1"]
-                m["code"] = None
-                m["answer"] = None
-                return self.reply({"correct":1})
-            else:
-                m["time"][pid] -= 5
-                if m["time"][pid] <= 0:
-                    opp = m["p1"] if pid == m["p2"] else m["p2"]
-                    m["winner"] = opp
-                return self.reply({"correct":0})
+def broadcast_state(room):
+    for pid in [room.player1_id, room.player2_id]:
+        ws = player_connections.get(pid)
+        if ws and not ws.closed: ws.send({"type":"state_update","state":room.state(pid)})
 
-        self.reply({"error":"not found"}, status=404)
+def broadcast_over(room):
+    room.finished = True
+    for pid in [room.player1_id, room.player2_id]:
+        ws = player_connections.get(pid)
+        if ws and not ws.closed:
+            ws.send({"type":"game_over","winner":room.winner,"is_winner":room.winner==pid,"state":room.state(pid)})
 
-print("http://localhost:8080")
-http.server.HTTPServer(("0.0.0.0",8080), H).serve_forever()
+def cleanup(pid):
+    with global_lock:
+        for i,p in enumerate(waiting_players):
+            if p["id"]==pid: waiting_players.pop(i); break
+    room = find_room(pid)
+    if room and not room.finished:
+        room.finished = True; room.winner = room.opp(pid)
+        ws = player_connections.get(room.winner)
+        if ws and not ws.closed:
+            ws.send({"type":"game_over","winner":room.winner,"is_winner":True,"reason":"opponent_disconnected","state":room.state(room.winner)})
+
+HTML = open("index.html","r",encoding="utf-8").read()
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def do_GET(self):
+        p = urlparse(self.path).path
+        if p == '/':
+            body = HTML.encode(); self.send_response(200)
+            self.send_header('Content-Type','text/html; charset=utf-8')
+            self.send_header('Content-Length',len(body)); self.end_headers(); self.wfile.write(body)
+        elif p == '/ws': self._ws()
+        elif p == '/stats':
+            with global_lock:
+                body = json.dumps({"waiting":len(waiting_players),"active_games":len(active_games),"total_connections":len(player_connections)}).encode()
+            self.send_response(200); self.send_header('Content-Type','application/json')
+            self.send_header('Content-Length',len(body)); self.end_headers(); self.wfile.write(body)
+        else: self.send_response(404); self.end_headers()
+
+    def _ws(self):
+        key = self.headers.get('Sec-WebSocket-Key','')
+        accept = base64.b64encode(hashlib.sha1((key+WS_MAGIC).encode()).digest()).decode()
+        self.send_response(101); self.send_header('Upgrade','websocket')
+        self.send_header('Connection','Upgrade'); self.send_header('Sec-WebSocket-Accept',accept); self.end_headers()
+        pid = str(uuid.uuid4())
+        ws = WS(self.connection, pid)
+        with global_lock: player_connections[pid] = ws
+        print(f"[+] {pid[:8]}")
+        try:
+            while not ws.closed:
+                op, payload = ws.recv()
+                if op is None or op == 0x8: break
+                if op == 0x1:
+                    try: handle_msg(ws, pid, json.loads(payload.decode()))
+                    except Exception as e: ws.send({"type":"error","message":str(e)})
+        finally:
+            print(f"[-] {pid[:8]}")
+            cleanup(pid)
+            with global_lock: player_connections.pop(pid, None)
+
+if __name__ == "__main__":
+    PORT = 8080
+    server = socketserver.ThreadingTCPServer(('0.0.0.0', PORT), Handler)
+    server.allow_reuse_address = True
+    print(f"🎮 クソコードバトル起動!")
+    print(f"   → http://localhost:{PORT}")
+    print(f"   → 依存なし (標準ライブラリのみ)")
+    try: server.serve_forever()
+    except KeyboardInterrupt: print("停止")
