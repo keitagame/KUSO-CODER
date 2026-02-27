@@ -93,11 +93,23 @@ class GameRoom:
         return {"correct": False, "message": f"不正解... 正解は: {c['answer']}", "answer": c["answer"]}
 
     def check_over(self):
-        for pid, p in self.players.items():
-            if p["time_left"] <= 0:
-                self.finished = True
-                self.winner = self.opp(pid)
-                return True
+        # 誰かが時間切れになったら試合終了
+        if any(p["time_left"] <= 0 for p in self.players.values()):
+            self.finished = True
+
+            p1 = self.players[self.player1_id]
+            p2 = self.players[self.player2_id]
+
+            # スコア比較
+            if p1["score"] > p2["score"]:
+                self.winner = self.player1_id
+            elif p2["score"] > p1["score"]:
+                self.winner = self.player2_id
+            else:
+                self.winner = None  # 引き分け
+
+            return True
+
         return False
 
     def state(self, pid):
