@@ -9,1276 +9,490 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
 <style>
-  :root {
-    --bg: #0a0a0f;
-    --surface: #12121a;
-    --surface2: #1a1a28;
-    --border: #2a2a45;
-    --accent: #ff3366;
-    --accent2: #00ffcc;
-    --accent3: #ffcc00;
-    --text: #e0e0ff;
-    --text-dim: #7070a0;
-    --danger: #ff4444;
-    --success: #00ff88;
-    --p1: #ff3366;
-    --p2: #00aaff;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'M PLUS 1p', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* ノイズテクスチャ背景 */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* スキャンライン */
-  body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,204,0.01) 2px, rgba(0,255,204,0.01) 4px);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* ============ SCREENS ============ */
-  .screen { display: none; position: relative; z-index: 1; }
-  .screen.active { display: block; }
-
-  /* ============ TITLE SCREEN ============ */
-  #title-screen {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 2rem;
-  }
-
-  .title-glitch {
-    font-family: 'Zen Dots', cursive;
-    font-size: clamp(2.5rem, 8vw, 6rem);
-    color: var(--accent);
-    text-shadow:
-      0 0 20px var(--accent),
-      0 0 60px rgba(255,51,102,0.4),
-      2px 2px 0 var(--accent2),
-      -2px -2px 0 var(--accent3);
-    letter-spacing: 0.05em;
-    animation: glitch 3s infinite;
-    margin-bottom: 0.5rem;
-  }
-
-  @keyframes glitch {
-    0%, 90%, 100% { transform: none; filter: none; }
-    92% { transform: skew(-1deg); filter: hue-rotate(90deg); }
-    94% { transform: skew(1deg) translateX(3px); filter: hue-rotate(-90deg); }
-    96% { transform: none; filter: hue-rotate(0deg); }
-  }
-
-  .title-sub {
-    font-family: 'Share Tech Mono', monospace;
-    color: var(--accent2);
-    font-size: 1rem;
-    letter-spacing: 0.3em;
-    margin-bottom: 3rem;
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-
-  .server-stats {
-    display: flex;
-    gap: 2rem;
-    margin-bottom: 3rem;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.8rem;
-    color: var(--text-dim);
-  }
-
-  .stat-item { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
-  .stat-value { color: var(--accent2); font-size: 1.4rem; font-weight: 700; }
-
-  .name-input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    align-items: center;
-    width: 100%;
-    max-width: 400px;
-  }
-
-  .input-field {
-    background: var(--surface);
-    border: 2px solid var(--border);
-    color: var(--text);
-    padding: 0.8rem 1.2rem;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 1rem;
-    width: 100%;
-    outline: none;
-    transition: border-color 0.2s;
-    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
-  }
-
-  .input-field:focus { border-color: var(--accent2); }
-
-  .btn {
-    background: transparent;
-    border: 2px solid var(--accent);
-    color: var(--accent);
-    padding: 0.8rem 2.5rem;
-    font-family: 'Zen Dots', cursive;
-    font-size: 1rem;
-    cursor: pointer;
-    letter-spacing: 0.1em;
-    transition: all 0.2s;
-    position: relative;
-    clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
-  }
-
-  .btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: var(--accent);
-    opacity: 0;
-    transition: opacity 0.2s;
-    z-index: -1;
-  }
-
-  .btn:hover { color: #000; }
-  .btn:hover::before { opacity: 1; }
-
-  .btn-secondary { border-color: var(--accent2); color: var(--accent2); }
-  .btn-secondary:hover { color: #000; }
-  .btn-secondary::before { background: var(--accent2); }
-
-  /* ============ MATCHING SCREEN ============ */
-  #matching-screen {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    gap: 2rem;
-  }
-
-  .matching-radar {
-    width: 200px;
-    height: 200px;
-    border: 2px solid var(--accent2);
-    border-radius: 50%;
-    position: relative;
-    animation: radarSpin 2s linear infinite;
-  }
-
-  .matching-radar::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 50%;
-    height: 2px;
-    background: linear-gradient(90deg, var(--accent2), transparent);
-    transform-origin: left center;
-    animation: radarBeam 2s linear infinite;
-  }
-
-  @keyframes radarSpin { 0% {} 100% {} }
-  @keyframes radarBeam { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-  .matching-text {
-    font-family: 'Zen Dots', cursive;
-    font-size: 1.5rem;
-    color: var(--accent2);
-    animation: pulse 1s infinite;
-  }
-
-  /* ============ GAME SCREEN ============ */
-  #game-screen {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    padding: 1rem;
-    gap: 0.8rem;
-  }
-
-  /* タイマーバー */
-  .timer-bars {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    gap: 1rem;
-    align-items: center;
-  }
-
-  .timer-bar-wrap {
-    height: 40px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .timer-bar-fill {
-    height: 100%;
-    transition: width 0.5s linear, background-color 0.5s;
-    background: var(--accent2);
-  }
-
-  .timer-bar-fill.my-bar { background: var(--p1); }
-  .timer-bar-fill.opp-bar { background: var(--p2); transform-origin: right; }
-
-  .timer-bar-wrap.reversed { direction: rtl; }
-
-  .timer-text {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 1.1rem;
-    font-weight: 700;
-    z-index: 1;
-    direction: ltr;
-  }
-
-  .timer-divider {
-    text-align: center;
-    font-family: 'Zen Dots', cursive;
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.2rem;
-  }
-
-  .vs-badge {
-    font-size: 1.2rem;
-    color: var(--accent3);
-    text-shadow: 0 0 20px var(--accent3);
-  }
-
-  /* スコア */
-  .score-row {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    gap: 1rem;
-    align-items: center;
-    text-align: center;
-  }
-
-  .player-score {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .player-name {
-    font-family: 'Zen Dots', cursive;
-    font-size: 0.7rem;
-    letter-spacing: 0.1em;
-    margin-bottom: 0.2rem;
-  }
-
-  .score-num {
-    font-family: 'Zen Dots', cursive;
-    font-size: 2rem;
-    line-height: 1;
-  }
-
-  .my-score .score-num { color: var(--p1); text-shadow: 0 0 20px var(--p1); }
-  .opp-score .score-num { color: var(--p2); text-shadow: 0 0 20px var(--p2); }
-
-  /* メインゲームエリア */
-  .game-main {
-    display: grid;
-    grid-template-columns: 1fr 1.6fr;
-    gap: 0.8rem;
-    flex: 1;
-  }
-
-  /* デッキ / 手札パネル */
-  .deck-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-  }
-
-  .panel-label {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.65rem;
-    color: var(--text-dim);
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-  }
-
-  .hand-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    flex: 1;
-  }
-
-  /* カード */
-  .card {
-    background: var(--surface);
-    border: 2px solid var(--border);
-    padding: 0.7rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
-  }
-
-  .card:hover {
-    border-color: var(--accent3);
-    background: var(--surface2);
-    transform: translateX(4px);
-  }
-
-  .card.selected {
-    border-color: var(--accent);
-    background: rgba(255,51,102,0.1);
-    box-shadow: 0 0 20px rgba(255,51,102,0.3);
-  }
-
-  .card.solving {
-    border-color: var(--accent2);
-    animation: solvingPulse 1s infinite;
-  }
-
-  @keyframes solvingPulse {
-    0%, 100% { box-shadow: 0 0 10px rgba(0,255,204,0.3); }
-    50% { box-shadow: 0 0 25px rgba(0,255,204,0.7); }
-  }
-
-  .card-title {
-    font-family: 'Zen Dots', cursive;
-    font-size: 0.75rem;
-    color: var(--accent3);
-    margin-bottom: 0.3rem;
-  }
-
-  .card-tags {
-    display: flex;
-    gap: 0.3rem;
-    flex-wrap: wrap;
-  }
-
-  .tag {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.6rem;
-    padding: 0.1rem 0.4rem;
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    letter-spacing: 0.1em;
-  }
-
-  .card-difficulty {
-    position: absolute;
-    top: 0.4rem;
-    right: 0.6rem;
-    display: flex;
-    gap: 2px;
-  }
-
-  .diff-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--border);
-  }
-
-  .diff-dot.filled { background: var(--accent3); }
-
-  .deck-info {
-    display: flex;
-    justify-content: space-between;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    padding: 0.4rem 0.2rem;
-    border-top: 1px solid var(--border);
-  }
-
-  /* コードパネル */
-  .code-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-  }
-
-  .code-display {
-    background: #1a1b26;
-    border: 1px solid var(--border);
-    border-top: 3px solid var(--accent);
-    flex: 1;
-    overflow: auto;
-    position: relative;
-    min-height: 200px;
-  }
-
-  .code-display-inner {
-    padding: 1rem;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.9rem;
-    line-height: 1.6;
-  }
-
-  .no-code-msg {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-dim);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.85rem;
-    gap: 0.5rem;
-  }
-
-  .no-code-arrow {
-    font-size: 2rem;
-    animation: arrowBounce 1s infinite;
-  }
-
-  @keyframes arrowBounce {
-    0%, 100% { transform: translateX(-5px); }
-    50% { transform: translateX(5px); }
-  }
-
-  .code-title-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 0.5rem 0.3rem;
-  }
-
-  .code-card-name {
-    font-family: 'Zen Dots', cursive;
-    font-size: 0.8rem;
-    color: var(--accent3);
-  }
-
-  .hint-btn {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.65rem;
-    padding: 0.2rem 0.6rem;
-    cursor: pointer;
-    letter-spacing: 0.1em;
-    transition: all 0.2s;
-  }
-
-  .hint-btn:hover { border-color: var(--accent3); color: var(--accent3); }
-
-  .hint-text {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.75rem;
-    color: var(--accent3);
-    padding: 0.5rem;
-    background: rgba(255,204,0,0.05);
-    border: 1px dashed rgba(255,204,0,0.3);
-    display: none;
-  }
-
-  .hint-text.show { display: block; }
-
-  /* 回答エリア */
-  .answer-area {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .answer-input {
-    flex: 1;
-    background: var(--surface);
-    border: 2px solid var(--border);
-    color: var(--text);
-    padding: 0.7rem 1rem;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 1rem;
-    outline: none;
-    transition: border-color 0.2s;
-    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
-  }
-
-  .answer-input:focus { border-color: var(--accent2); }
-  .answer-input:disabled { opacity: 0.4; cursor: not-allowed; }
-
-  .submit-btn {
-    background: var(--accent);
-    border: none;
-    color: #000;
-    padding: 0.7rem 1.5rem;
-    font-family: 'Zen Dots', cursive;
-    font-size: 0.85rem;
-    cursor: pointer;
-    letter-spacing: 0.1em;
-    transition: all 0.2s;
-    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
-    font-weight: 700;
-  }
-
-  .submit-btn:hover { background: #ff6688; transform: scale(1.02); }
-  .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-  /* フィードバックメッセージ */
-  .feedback {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.85rem;
-    padding: 0.5rem;
-    text-align: center;
-    border: 1px solid transparent;
-    transition: all 0.3s;
-    min-height: 36px;
-  }
-
-  .feedback.correct {
-    color: var(--success);
-    border-color: var(--success);
-    background: rgba(0,255,136,0.05);
-    animation: feedbackFlash 0.3s;
-  }
-
-  .feedback.wrong {
-    color: var(--danger);
-    border-color: var(--danger);
-    background: rgba(255,68,68,0.05);
-    animation: feedbackFlash 0.3s;
-  }
-
-  @keyframes feedbackFlash {
-    0% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-  }
-
-  /* 相手状態パネル */
-  .opponent-status {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.5rem 1rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--p2);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.75rem;
-    color: var(--text-dim);
-  }
-
-  .opp-solving-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--p2);
-  }
-
-  .opp-solving-indicator.active { animation: solvingBlink 0.5s infinite; }
-  @keyframes solvingBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-
-  /* ============ RESULT SCREEN ============ */
-  #result-screen {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    gap: 2rem;
-    padding: 2rem;
-  }
-
-  .result-title {
-    font-family: 'Zen Dots', cursive;
-    font-size: clamp(3rem, 10vw, 7rem);
-    animation: resultAppear 0.5s ease-out;
-  }
-
-  .result-win { color: var(--success); text-shadow: 0 0 40px var(--success); }
-  .result-lose { color: var(--danger); text-shadow: 0 0 40px var(--danger); }
-
-  @keyframes resultAppear {
-    0% { transform: scale(0.5) rotate(-5deg); opacity: 0; }
-    100% { transform: scale(1) rotate(0deg); opacity: 1; }
-  }
-
-  .result-stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.9rem;
-    color: var(--text-dim);
-  }
-
-  .result-stat {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 1rem;
-  }
-
-  .result-stat-value {
-    font-size: 1.8rem;
-    color: var(--text);
-    display: block;
-    font-weight: 700;
-  }
-
-  /* ============ LOADING / TOAST ============ */
-  #toast {
-    position: fixed;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%) translateY(100px);
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    padding: 0.7rem 1.5rem;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.85rem;
-    z-index: 1000;
-    transition: transform 0.3s;
-    max-width: 400px;
-    text-align: center;
-  }
-
-  #toast.show { transform: translateX(-50%) translateY(0); }
-  #toast.success { border-color: var(--success); color: var(--success); }
-  #toast.error { border-color: var(--danger); color: var(--danger); }
-
-  /* hljs カスタム */
-  .hljs { background: transparent !important; padding: 0 !important; }
-
-  /* タイマー警告 */
-  .timer-bar-fill.danger { background: var(--danger) !important; animation: dangerPulse 0.5s infinite; }
-  @keyframes dangerPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-
-  /* レスポンシブ */
-  @media (max-width: 700px) {
-    .game-main { grid-template-columns: 1fr; }
-    .code-panel { order: -1; }
-    .card { padding: 0.5rem; }
-  }
-
-  /* カードをプレイするアニメ */
-  @keyframes cardPlay {
-    0% { transform: translateX(0); }
-    50% { transform: translateX(20px) scale(1.05); }
-    100% { transform: translateX(0); }
-  }
-
-  .card-play-anim { animation: cardPlay 0.3s ease-out; }
-
-  /* 接続状態 */
-  .connection-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--danger);
-    display: inline-block;
-    margin-right: 0.5rem;
-  }
-
-  .connection-dot.connected { background: var(--success); }
-
-  .status-bar {
-    position: fixed;
-    top: 0.5rem;
-    right: 0.5rem;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.65rem;
-    color: var(--text-dim);
-    display: flex;
-    align-items: center;
-    z-index: 100;
-  }
-
-  /* デッキカウンター可視化 */
-  .deck-visual {
-    display: flex;
-    gap: 3px;
-    flex-wrap: wrap;
-    padding: 0.3rem 0;
-  }
-
-  .deck-card-pip {
-    width: 12px;
-    height: 16px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    clip-path: polygon(0 0, calc(100% - 3px) 0, 100% 3px, 100% 100%, 3px 100%, 0 calc(100% - 3px));
-  }
-
-  .deck-card-pip.active { background: var(--p1); border-color: var(--p1); }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#090910;--s1:#111118;--s2:#181824;--border:#252538;
+  --red:#ff2d55;--cyan:#00e5cc;--yellow:#ffd60a;--blue:#0a84ff;
+  --green:#30d158;--text:#dde0ff;--dim:#5a5a80;
+}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:'M PLUS 1p',sans-serif;overflow:hidden}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:999;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,229,204,.012) 3px,rgba(0,229,204,.012) 4px)}
+
+/* VIEWS */
+.view{position:absolute;inset:0;display:none;flex-direction:column}
+.view.active{display:flex}
+
+/* TITLE */
+#v-title{align-items:center;justify-content:center;gap:0;padding:1.5rem;overflow:hidden}
+.title-bg{position:absolute;inset:0;background:radial-gradient(ellipse 60% 40% at 50% 30%,rgba(255,45,85,.08),transparent),radial-gradient(ellipse 40% 60% at 80% 70%,rgba(0,229,204,.05),transparent)}
+.logo{position:relative;font-family:'Zen Dots',cursive;font-size:clamp(2.2rem,6vw,4.5rem);color:var(--red);text-shadow:0 0 30px rgba(255,45,85,.6),3px 2px 0 var(--cyan),-1px -1px 0 var(--yellow);animation:logoGlitch 4s infinite;letter-spacing:.04em;margin-bottom:.3rem}
+@keyframes logoGlitch{0%,88%,100%{transform:none;filter:none}90%{transform:skew(-1.5deg);filter:hue-rotate(90deg)}92%{transform:skew(1deg) translateX(4px);filter:hue-rotate(-90deg)}94%{transform:none;filter:none}}
+.logo-sub{font-family:'Share Tech Mono',monospace;font-size:.75rem;color:var(--cyan);letter-spacing:.35em;margin-bottom:2rem;opacity:.8}
+.stats-row{display:flex;gap:2rem;margin-bottom:2rem;font-family:'Share Tech Mono',monospace;font-size:.7rem;color:var(--dim)}
+.stat{display:flex;flex-direction:column;align-items:center;gap:.2rem}
+.stat b{font-size:1.5rem;color:var(--cyan);font-family:'Zen Dots',cursive}
+.form-group{display:flex;flex-direction:column;gap:.8rem;width:100%;max-width:340px}
+input.name-in{background:var(--s1);border:2px solid var(--border);color:var(--text);padding:.75rem 1rem;font-family:'Share Tech Mono',monospace;font-size:.95rem;outline:none;transition:border-color .2s;width:100%;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,10px 100%,0 calc(100% - 10px))}
+input.name-in:focus{border-color:var(--cyan)}
+.btn-main{background:var(--red);border:none;color:#fff;padding:.75rem;font-family:'Zen Dots',cursive;font-size:1rem;cursor:pointer;letter-spacing:.12em;transition:all .15s;clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%);font-weight:700}
+.btn-main:hover{background:#ff5577;transform:scale(1.02)}
+.how-to{position:relative;margin-top:1.5rem;max-width:360px;font-family:'Share Tech Mono',monospace;font-size:.72rem;color:var(--dim);line-height:1.9;text-align:center}
+
+/* MATCHING */
+#v-match{align-items:center;justify-content:center;gap:1.5rem}
+.radar{width:160px;height:160px;border:2px solid var(--cyan);border-radius:50%;position:relative}
+.radar::before{content:'';position:absolute;top:50%;left:50%;width:50%;height:2px;background:linear-gradient(90deg,var(--cyan),transparent);transform-origin:left center;animation:radarSpin 1.8s linear infinite}
+.radar::after{content:'';position:absolute;inset:20%;border:1px solid rgba(0,229,204,.3);border-radius:50%}
+@keyframes radarSpin{to{transform:rotate(360deg)}}
+.match-label{font-family:'Zen Dots',cursive;font-size:1.1rem;color:var(--cyan);animation:blink 1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.btn-ghost{background:transparent;border:1.5px solid var(--dim);color:var(--dim);padding:.6rem 1.8rem;font-family:'Zen Dots',cursive;font-size:.8rem;cursor:pointer;letter-spacing:.1em;transition:all .2s;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)}
+.btn-ghost:hover{border-color:var(--text);color:var(--text)}
+
+/* GAME */
+#v-game{display:none;height:100vh;overflow:hidden}
+#v-game.active{display:grid;grid-template-rows:auto auto 1fr;grid-template-columns:1fr}
+
+/* timer strip */
+.timer-strip{display:grid;grid-template-columns:1fr 60px 1fr;gap:6px;padding:8px 10px 0}
+.t-bar-wrap{height:36px;position:relative;background:var(--s1);border:1px solid var(--border);overflow:hidden}
+.t-bar-fill{position:absolute;top:0;bottom:0;left:0;transition:width .4s linear}
+.t-bar-fill.mine{background:var(--red)}
+.t-bar-fill.theirs{background:var(--blue)}
+.t-bar-fill.danger{animation:dangerPulse .4s infinite alternate}
+@keyframes dangerPulse{to{opacity:.5}}
+.t-bar-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:1rem;font-weight:700;text-shadow:0 0 8px rgba(0,0,0,.8)}
+.t-vs{display:flex;align-items:center;justify-content:center;font-family:'Zen Dots',cursive;font-size:.75rem;color:var(--yellow)}
+
+/* score strip */
+.score-strip{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:4px 10px 6px;border-bottom:1px solid var(--border)}
+.p-info{display:flex;align-items:center;gap:.5rem}
+.p-info.opp{flex-direction:row-reverse}
+.p-name{font-family:'Zen Dots',cursive;font-size:.65rem;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px}
+.p-score{font-family:'Zen Dots',cursive;font-size:1.8rem;line-height:1}
+.p-info.me .p-score{color:var(--red);text-shadow:0 0 15px var(--red)}
+.p-info.opp .p-score{color:var(--blue);text-shadow:0 0 15px var(--blue)}
+.score-center{font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--dim);text-align:center}
+
+/* game body */
+.game-body{display:grid;grid-template-columns:220px 1fr;overflow:hidden;min-height:0}
+
+/* hand panel */
+.hand-panel{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
+.panel-hdr{padding:6px 10px;background:var(--s1);border-bottom:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--dim);letter-spacing:.15em;display:flex;justify-content:space-between;align-items:center}
+.panel-hdr span{color:var(--cyan)}
+.hand-list{flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:5px}
+.hand-list::-webkit-scrollbar{width:3px}
+.hand-list::-webkit-scrollbar-thumb{background:var(--border)}
+
+/* card */
+.card{background:var(--s1);border:1.5px solid var(--border);padding:8px 10px;cursor:pointer;transition:all .15s;position:relative;clip-path:polygon(0 0,calc(100% - 7px) 0,100% 7px,100% 100%,7px 100%,0 calc(100% - 7px))}
+.card:hover{border-color:var(--yellow);background:var(--s2);transform:translateX(3px)}
+.card.active-card{border-color:var(--cyan);background:rgba(0,229,204,.08)}
+.card.active-card::before{content:'▶';position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--cyan);font-size:.7rem}
+.card-title{font-family:'Zen Dots',cursive;font-size:.7rem;color:var(--yellow);margin-bottom:4px;padding-right:16px}
+.card-meta{display:flex;justify-content:space-between;align-items:center}
+.card-tags{display:flex;gap:3px;flex-wrap:wrap}
+.tag{font-family:'Share Tech Mono',monospace;font-size:.55rem;padding:1px 5px;border:1px solid var(--border);color:var(--dim)}
+.diff-pips{display:flex;gap:2px}
+.pip{width:5px;height:5px;border-radius:50%;background:var(--border)}
+.pip.on{background:var(--yellow)}
+.empty-hand{padding:1rem;font-family:'Share Tech Mono',monospace;font-size:.7rem;color:var(--dim);text-align:center}
+
+/* deck bar */
+.deck-bar{padding:6px 10px;border-top:1px solid var(--border);background:var(--s1)}
+.deck-pips{display:flex;gap:2px;flex-wrap:wrap}
+.deck-pip{width:10px;height:14px;clip-path:polygon(0 0,calc(100% - 2px) 0,100% 2px,100% 100%,2px 100%,0 calc(100% - 2px))}
+.deck-pip.on{background:rgba(255,45,85,.7)}
+.deck-pip.off{background:var(--s2);border:1px solid var(--border)}
+
+/* opp status */
+.opp-status{padding:5px 10px;border-top:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:.65rem;color:var(--dim);display:flex;align-items:center;gap:6px}
+.opp-dot{width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0}
+.opp-dot.solving{background:var(--blue);animation:solvingBlink .6s infinite alternate}
+@keyframes solvingBlink{to{opacity:.3}}
+
+/* code panel */
+.code-panel{display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.code-header{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--s1);border-bottom:1px solid var(--border);flex-shrink:0}
+.code-card-name{font-family:'Zen Dots',cursive;font-size:.72rem;color:var(--cyan)}
+.hint-btn{background:none;border:1px solid var(--border);color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:.6rem;padding:2px 8px;cursor:pointer;transition:all .15s;letter-spacing:.1em}
+.hint-btn:hover{border-color:var(--yellow);color:var(--yellow)}
+.code-display{flex:1;overflow:auto;background:#11121f;min-height:0}
+.code-display::-webkit-scrollbar{width:4px;height:4px}
+.code-display::-webkit-scrollbar-thumb{background:var(--border)}
+.code-pre{padding:12px;margin:0;font-family:'Share Tech Mono',monospace;font-size:.88rem;line-height:1.65}
+.no-code{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;font-family:'Share Tech Mono',monospace;font-size:.78rem;color:var(--dim);padding:1rem}
+.arrow-left{font-size:1.5rem;color:var(--yellow);animation:arrowAnim 1.2s ease-in-out infinite}
+@keyframes arrowAnim{0%,100%{transform:translateX(0)}50%{transform:translateX(-8px)}}
+.hint-bar{padding:6px 10px;background:rgba(255,214,10,.06);border-top:1px dashed rgba(255,214,10,.25);font-family:'Share Tech Mono',monospace;font-size:.72rem;color:var(--yellow);display:none;flex-shrink:0}
+.hint-bar.show{display:block}
+
+/* answer strip */
+.answer-strip{display:flex;gap:6px;padding:8px;border-top:1px solid var(--border);flex-shrink:0}
+.answer-in{flex:1;background:var(--s1);border:1.5px solid var(--border);color:var(--text);padding:.6rem .8rem;font-family:'Share Tech Mono',monospace;font-size:.9rem;outline:none;transition:border-color .15s;clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%)}
+.answer-in:focus{border-color:var(--cyan)}
+.answer-in:disabled{opacity:.35;cursor:not-allowed}
+.submit-btn{background:var(--red);border:none;color:#fff;padding:.6rem 1.2rem;font-family:'Zen Dots',cursive;font-size:.8rem;cursor:pointer;letter-spacing:.08em;transition:all .15s;font-weight:700;clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%)}
+.submit-btn:hover{background:#ff5070}
+.submit-btn:disabled{opacity:.35;cursor:not-allowed}
+.feedback-bar{padding:4px 10px;min-height:28px;font-family:'Share Tech Mono',monospace;font-size:.75rem;text-align:center;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.feedback-bar.ok{color:var(--green);background:rgba(48,209,88,.07)}
+.feedback-bar.bad{color:var(--red);background:rgba(255,45,85,.07)}
+
+/* RESULT */
+#v-result{align-items:center;justify-content:center;gap:1.2rem;padding:2rem;text-align:center}
+.result-big{font-family:'Zen Dots',cursive;font-size:clamp(3.5rem,12vw,7rem);animation:resultPop .4s cubic-bezier(.17,.67,.24,1.4)}
+.result-big.win{color:var(--green);text-shadow:0 0 40px var(--green)}
+.result-big.lose{color:var(--red);text-shadow:0 0 40px var(--red)}
+@keyframes resultPop{0%{transform:scale(.4) rotate(-8deg);opacity:0}100%{transform:none;opacity:1}}
+.result-reason{font-family:'Share Tech Mono',monospace;font-size:.85rem;color:var(--dim)}
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;width:100%;max-width:320px}
+.result-cell{background:var(--s1);border:1px solid var(--border);padding:.8rem}
+.result-cell-val{font-family:'Zen Dots',cursive;font-size:1.6rem;display:block;margin-bottom:.2rem}
+.result-cell-lbl{font-family:'Share Tech Mono',monospace;font-size:.65rem;color:var(--dim)}
+
+/* TOAST */
+#toast{position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%) translateY(60px);background:var(--s2);border:1px solid var(--border);padding:.6rem 1.2rem;font-family:'Share Tech Mono',monospace;font-size:.8rem;z-index:1000;transition:transform .25s;white-space:nowrap;pointer-events:none}
+#toast.show{transform:translateX(-50%) translateY(0)}
+#toast.ok{border-color:var(--green);color:var(--green)}
+#toast.err{border-color:var(--red);color:var(--red)}
+
+/* conn */
+#conn{position:fixed;top:.5rem;right:.8rem;z-index:100;font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--dim);display:flex;align-items:center;gap:4px}
+#conn-dot{width:6px;height:6px;border-radius:50%;background:var(--red)}
+#conn-dot.on{background:var(--green)}
+.hljs{background:transparent!important;padding:0!important}
+
+@media(max-width:560px){
+  .game-body{grid-template-columns:155px 1fr}
+  .p-name{max-width:70px;font-size:.55rem}
+}
 </style>
 </head>
 <body>
 
-<div class="status-bar">
-  <span class="connection-dot" id="conn-dot"></span>
-  <span id="conn-text">OFFLINE</span>
-</div>
+<div id="conn"><div id="conn-dot"></div><span id="conn-txt">OFFLINE</span></div>
 
-<!-- TITLE SCREEN -->
-<div id="title-screen" class="screen active">
-  <div class="title-glitch">クソコードバトル</div>
-  <div class="title-sub">// UGLY CODE SHOWDOWN //</div>
-
-  <div class="server-stats" id="server-stats">
-    <div class="stat-item">
-      <span class="stat-value" id="stat-waiting">-</span>
-      <span>WAITING</span>
-    </div>
-    <div class="stat-item">
-      <span class="stat-value" id="stat-games">-</span>
-      <span>ACTIVE GAMES</span>
-    </div>
-    <div class="stat-item">
-      <span class="stat-value" id="stat-players">-</span>
-      <span>ONLINE</span>
-    </div>
+<!-- TITLE -->
+<div id="v-title" class="view active">
+  <div class="title-bg"></div>
+  <div class="logo">クソコードバトル</div>
+  <div class="logo-sub">// UGLY CODE SHOWDOWN //</div>
+  <div class="stats-row">
+    <div class="stat"><b id="s-wait">-</b>WAITING</div>
+    <div class="stat"><b id="s-games">-</b>BATTLES</div>
+    <div class="stat"><b id="s-online">-</b>ONLINE</div>
   </div>
-
-  <div class="name-input-group">
-    <input type="text" class="input-field" id="username-input" placeholder="YOUR_USERNAME" maxlength="16" autocomplete="off">
-    <button class="btn" onclick="startMatching()">BATTLE START</button>
+  <div class="form-group">
+    <input id="uname" class="name-in" type="text" placeholder="YOUR_USERNAME" maxlength="16" autocomplete="off">
+    <button class="btn-main" onclick="startMatch()">⚔ BATTLE START</button>
   </div>
-
-  <div style="margin-top: 2rem; font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; color: var(--text-dim); max-width: 400px; line-height: 1.8;">
-    <div style="color: var(--accent3); margin-bottom: 0.5rem;">// HOW TO PLAY //</div>
-    <div>① 全世界のプレイヤーとマッチング</div>
-    <div>② 手札からクソコードカードを選んで出す</div>
-    <div>③ コードの出力値を当てる</div>
-    <div>④ タイマーが先に切れたら<span style="color: var(--danger)"> GAME OVER</span></div>
-    <div>⑤ 多く正解した方が勝ち（タイマー残量が多い方）</div>
+  <div class="how-to">
+    <span style="color:var(--yellow)">// HOW TO PLAY //</span><br>
+    ① 全世界マッチング&nbsp;&nbsp;② 手札からカードを出す<br>
+    ③ コードの出力を当てる&nbsp;&nbsp;④ タイマーは<span style="color:var(--red)">常時</span>カウントダウン<br>
+    ⑤ 先に0秒になった方が <span style="color:var(--red)">LOSE</span>
   </div>
 </div>
 
-<!-- MATCHING SCREEN -->
-<div id="matching-screen" class="screen">
-  <div class="matching-radar"></div>
-  <div class="matching-text">SEARCHING FOR OPPONENT...</div>
-  <div style="font-family: 'Share Tech Mono', monospace; font-size: 0.8rem; color: var(--text-dim);">
-    全世界マッチング中 - しばらくお待ちください
-  </div>
-  <button class="btn btn-secondary" onclick="cancelMatch()">CANCEL</button>
+<!-- MATCHING -->
+<div id="v-match" class="view">
+  <div class="radar"></div>
+  <div class="match-label">SEARCHING FOR OPPONENT...</div>
+  <div style="font-family:'Share Tech Mono',monospace;font-size:.75rem;color:var(--dim)">全世界マッチング中</div>
+  <button class="btn-ghost" onclick="cancelMatch()">CANCEL</button>
 </div>
 
-<!-- GAME SCREEN -->
-<div id="game-screen" class="screen">
-  <!-- タイマーバー -->
-  <div class="timer-bars">
-    <div class="timer-bar-wrap">
-      <div class="timer-bar-fill my-bar" id="my-timer-bar" style="width:100%"></div>
-      <div class="timer-text" id="my-timer-text">60.0s</div>
+<!-- GAME -->
+<div id="v-game" class="view">
+  <div class="timer-strip">
+    <div class="t-bar-wrap">
+      <div class="t-bar-fill mine" id="t-mine" style="width:100%"></div>
+      <div class="t-bar-text" id="t-mine-txt">60.0s</div>
     </div>
-    <div class="timer-divider">
-      <span class="vs-badge">VS</span>
-      <span style="font-size:0.6rem; color: var(--text-dim);" id="opponent-name-label">OPPONENT</span>
-    </div>
-    <div class="timer-bar-wrap reversed">
-      <div class="timer-bar-fill opp-bar" id="opp-timer-bar" style="width:100%"></div>
-      <div class="timer-text" id="opp-timer-text">60.0s</div>
+    <div class="t-vs">VS</div>
+    <div class="t-bar-wrap">
+      <div class="t-bar-fill theirs" id="t-theirs" style="width:100%"></div>
+      <div class="t-bar-text" id="t-theirs-txt">60.0s</div>
     </div>
   </div>
-
-  <!-- スコア -->
-  <div class="score-row">
-    <div class="player-score my-score">
-      <div class="player-name" style="color: var(--p1);" id="my-name-label">YOU</div>
-      <div class="score-num" id="my-score">0</div>
-      <div style="font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; color: var(--text-dim);">SOLVED</div>
-    </div>
-    <div style="font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; color: var(--text-dim); text-align: center;">
-      <div id="game-id-label" style="color: var(--border); font-size: 0.6rem;">GAME #----</div>
-    </div>
-    <div class="player-score opp-score">
-      <div class="player-name" style="color: var(--p2);" id="opp-name-label">OPPONENT</div>
-      <div class="score-num" id="opp-score">0</div>
-      <div style="font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; color: var(--text-dim);">SOLVED</div>
-    </div>
-  </div>
-
-  <!-- メインゲームエリア -->
-  <div class="game-main">
-    <!-- 左: 手札 -->
-    <div class="deck-panel">
-      <div class="panel-label">// HAND - カードを選んで出す //</div>
-      <div class="hand-grid" id="hand-grid"></div>
-      <div class="deck-info">
-        <span>DECK: <span id="deck-count">0</span></span>
-        <span>HAND: <span id="hand-count">0</span>/5</span>
-      </div>
-      <div class="deck-visual" id="deck-visual"></div>
-
-      <!-- 相手状態 -->
-      <div class="opponent-status">
-        <div class="opp-solving-indicator" id="opp-indicator"></div>
-        <span id="opp-status-text">相手を待っています</span>
+  <div class="score-strip">
+    <div class="p-info me">
+      <div class="p-score" id="my-score">0</div>
+      <div>
+        <div class="p-name" id="my-name" style="color:var(--red)">YOU</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.55rem;color:var(--dim)">SOLVED</div>
       </div>
     </div>
-
-    <!-- 右: コードエリア -->
+    <div class="score-center" id="game-id-lbl">GAME #----</div>
+    <div class="p-info opp">
+      <div class="p-score" id="opp-score">0</div>
+      <div>
+        <div class="p-name" id="opp-name" style="color:var(--blue)">OPP</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.55rem;color:var(--dim)">SOLVED</div>
+      </div>
+    </div>
+  </div>
+  <div class="game-body">
+    <div class="hand-panel">
+      <div class="panel-hdr">HAND <span id="hand-cnt">0</span>/5</div>
+      <div class="hand-list" id="hand-list"></div>
+      <div class="deck-bar">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--dim);margin-bottom:4px">DECK: <span id="deck-cnt">0</span></div>
+        <div class="deck-pips" id="deck-pips"></div>
+      </div>
+      <div class="opp-status">
+        <div class="opp-dot" id="opp-dot"></div>
+        <span id="opp-status">相手の状況待ち</span>
+      </div>
+    </div>
     <div class="code-panel">
-      <div class="code-title-bar">
-        <div class="code-card-name" id="code-title">// コードを選んでください //</div>
-        <button class="hint-btn" id="hint-btn" onclick="toggleHint()" style="display:none">HINT?</button>
+      <div class="code-header">
+        <div class="code-card-name" id="code-title">← カードを選んでください</div>
+        <button class="hint-btn" id="hint-btn" onclick="toggleHint()" style="display:none">HINT</button>
       </div>
-      <div class="code-display">
-        <div class="no-code-msg" id="no-code-msg">
-          <div class="no-code-arrow">←</div>
-          <div>手札からカードを選んで出しましょう</div>
-          <div style="font-size: 0.7rem;">タイマーは解いている間だけ進みます</div>
-        </div>
-        <div class="code-display-inner" id="code-display-inner" style="display:none">
-          <pre><code class="language-python" id="code-content"></code></pre>
+      <div class="code-display" id="code-display">
+        <div class="no-code">
+          <div class="arrow-left">←</div>
+          <div>手札からカードを出して挑戦</div>
+          <div style="font-size:.65rem;color:var(--dim);margin-top:.3rem">タイマーは常時カウントダウン中！</div>
         </div>
       </div>
-      <div class="hint-text" id="hint-text"></div>
-
-      <div class="answer-area">
-        <input type="text"
-               class="answer-input"
-               id="answer-input"
-               placeholder="出力結果を入力... (Enterで送信)"
-               disabled
-               autocomplete="off"
-               onkeydown="if(event.key==='Enter') submitAnswer()">
-        <button class="submit-btn" id="submit-btn" onclick="submitAnswer()" disabled>送信</button>
+      <div class="hint-bar" id="hint-bar"></div>
+      <div class="answer-strip">
+        <input class="answer-in" id="ans-in" placeholder="出力結果を入力... (Enter)" disabled autocomplete="off" onkeydown="if(event.key==='Enter')submitAns()">
+        <button class="submit-btn" id="ans-btn" onclick="submitAns()" disabled>送信</button>
       </div>
-      <div class="feedback" id="feedback"></div>
+      <div class="feedback-bar" id="feedback"></div>
     </div>
   </div>
 </div>
 
-<!-- RESULT SCREEN -->
-<div id="result-screen" class="screen">
-  <div class="result-title" id="result-title">WIN!</div>
-  <div style="font-family: 'Share Tech Mono', monospace; color: var(--text-dim);" id="result-reason"></div>
-  <div class="result-stats" id="result-stats"></div>
-  <button class="btn" onclick="backToTitle()">PLAY AGAIN</button>
+<!-- RESULT -->
+<div id="v-result" class="view">
+  <div class="result-big" id="r-title">WIN!</div>
+  <div class="result-reason" id="r-reason"></div>
+  <div class="result-grid" id="r-grid"></div>
+  <button class="btn-main" style="width:200px" onclick="goTitle()">PLAY AGAIN</button>
 </div>
 
-<!-- TOAST -->
 <div id="toast"></div>
 
 <script>
-// ==================== 状態管理 ====================
-let ws = null;
-let gameState = null;
-let myName = '';
-let opponentName = '';
-let timerInterval = null;
-let currentScreen = 'title';
-let hintVisible = false;
-let myTimeLeft = 60;
-let oppTimeLeft = 60;
-const MAX_TIME = 60;
+let ws=null,gs=null,myName='',oppName='';
+let timerInterval=null,hintOpen=false;
+let myTime=60,oppTime=60;
+const MAX_TIME=60;
 
-// ==================== WS接続 ====================
-function connectWS() {
-  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${location.host}/ws`;
-  ws = new WebSocket(wsUrl);
-
-  ws.onopen = () => {
-    setConnectionStatus(true);
-    // pingループ
-    setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
-    }, 5000);
-    // サーバー統計定期取得
-    fetchStats();
-    setInterval(fetchStats, 5000);
-  };
-
-  ws.onclose = () => {
-    setConnectionStatus(false);
-    setTimeout(connectWS, 3000);
-  };
-
-  ws.onerror = () => setConnectionStatus(false);
-
-  ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
-    handleMessage(msg);
-  };
+function showView(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('v-'+id).classList.add('active');
 }
 
-function setConnectionStatus(connected) {
-  document.getElementById('conn-dot').className = 'connection-dot' + (connected ? ' connected' : '');
-  document.getElementById('conn-text').textContent = connected ? 'ONLINE' : 'OFFLINE';
+function connectWS(){
+  const proto=location.protocol==='https:'?'wss:':'ws:';
+  ws=new WebSocket(`${proto}//${location.host}/ws`);
+  ws.onopen=()=>{setConn(true);fetchStats();setInterval(fetchStats,5000);setInterval(ping,5000)};
+  ws.onclose=()=>{setConn(false);stopTimer();setTimeout(connectWS,3000)};
+  ws.onerror=()=>setConn(false);
+  ws.onmessage=e=>dispatch(JSON.parse(e.data));
+}
+function send(o){if(ws?.readyState===1)ws.send(JSON.stringify(o))}
+function ping(){send({type:'ping'})}
+function setConn(ok){
+  document.getElementById('conn-dot').className=ok?'on':'';
+  document.getElementById('conn-txt').textContent=ok?'ONLINE':'OFFLINE';
 }
 
-function send(obj) {
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+function dispatch(m){
+  if(m.type==='pong')return;
+  if(m.type==='waiting'){showView('match');return}
+  if(m.type==='game_start'){onGameStart(m);return}
+  if(m.type==='state_update'){applyState(m.state);return}
+  if(m.type==='timer_update'){myTime=m.my_time;oppTime=m.opponent_time;renderTimers();return}
+  if(m.type==='answer_result'){onAnswerResult(m);return}
+  if(m.type==='game_over'){onGameOver(m);return}
+  if(m.type==='error'){toast(m.message,'err');return}
 }
 
-// ==================== メッセージハンドラ ====================
-function handleMessage(msg) {
-  switch (msg.type) {
-    case 'pong': break;
+function onGameStart(m){
+  oppName=m.opponent_name;
+  document.getElementById('game-id-lbl').textContent=`GAME #${m.game_id.slice(0,6).toUpperCase()}`;
+  document.getElementById('my-name').textContent=myName;
+  document.getElementById('opp-name').textContent=oppName;
+  applyState(m.state);
+  showView('game');
+  startTimer();
+  toast('マッチング成功！バトル開始！','ok');
+}
 
-    case 'waiting':
-      showScreen('matching');
-      break;
-
-    case 'game_start':
-      opponentName = msg.opponent_name;
-      document.getElementById('game-id-label').textContent = `GAME #${msg.game_id.substring(0,6).toUpperCase()}`;
-      document.getElementById('my-name-label').textContent = myName;
-      document.getElementById('opp-name-label').textContent = opponentName;
-      document.getElementById('opponent-name-label').textContent = opponentName;
-      updateGameState(msg.state);
-      showScreen('game');
-      startTimerLoop();
-      showToast('🎮 マッチング成功！バトル開始！', 'success');
-      break;
-
-    case 'state_update':
-      updateGameState(msg.state);
-      break;
-
-    case 'timer_update':
-      myTimeLeft = msg.my_time;
-      oppTimeLeft = msg.opponent_time;
-      updateTimerDisplay();
-      break;
-
-    case 'answer_result':
-      handleAnswerResult(msg);
-      break;
-
-    case 'game_over':
-      stopTimerLoop();
-      showGameOver(msg);
-      break;
-
-    case 'error':
-      showToast(msg.message, 'error');
-      break;
+function applyState(s){
+  gs=s;
+  myTime=s.me.time_left;oppTime=s.opponent.time_left;
+  renderTimers();
+  document.getElementById('my-score').textContent=s.me.score;
+  document.getElementById('opp-score').textContent=s.opponent.score;
+  document.getElementById('hand-cnt').textContent=s.me.hand_count;
+  document.getElementById('deck-cnt').textContent=s.me.deck_count;
+  renderHand(s.me.hand,s.me.current_code);
+  renderDeckPips(s.me.deck_count);
+  renderOppStatus(s.opponent);
+  if(s.me.current_code){
+    showCode(s.me.current_code);
+    document.getElementById('ans-in').disabled=false;
+    document.getElementById('ans-btn').disabled=false;
+  }else{
+    clearCode();
   }
+  if(s.finished)stopTimer();
 }
 
-// ==================== ゲーム状態更新 ====================
-function updateGameState(state) {
-  gameState = state;
-
-  // スコア
-  document.getElementById('my-score').textContent = state.me.score;
-  document.getElementById('opp-score').textContent = state.opponent.score;
-
-  // タイマー
-  myTimeLeft = state.me.time_left;
-  oppTimeLeft = state.opponent.time_left;
-  updateTimerDisplay();
-
-  // デッキ情報
-  document.getElementById('deck-count').textContent = state.me.deck_count;
-  document.getElementById('hand-count').textContent = state.me.hand_count;
-  updateDeckVisual(state.me.deck_count + state.me.hand_count);
-
-  // 手札
-  renderHand(state.me.hand, state.me.current_code);
-
-  // コード表示
-  if (state.me.current_code) {
-    showCode(state.me.current_code);
-    document.getElementById('answer-input').disabled = false;
-    document.getElementById('submit-btn').disabled = false;
-  } else {
-    hideCode();
-  }
-
-  // 相手状態
-  updateOpponentStatus(state.opponent);
-
-  // ゲームオーバー
-  if (state.finished) {
-    stopTimerLoop();
-  }
+function renderTimers(){
+  const mp=Math.max(0,(myTime/MAX_TIME)*100);
+  const op=Math.max(0,(oppTime/MAX_TIME)*100);
+  const mb=document.getElementById('t-mine');
+  const ob=document.getElementById('t-theirs');
+  mb.style.width=mp+'%';ob.style.width=op+'%';
+  document.getElementById('t-mine-txt').textContent=myTime.toFixed(1)+'s';
+  document.getElementById('t-theirs-txt').textContent=oppTime.toFixed(1)+'s';
+  mb.className='t-bar-fill mine'+(myTime<12?' danger':'');
+  ob.className='t-bar-fill theirs'+(oppTime<12?' danger':'');
 }
 
-function updateTimerDisplay() {
-  const myPct = (myTimeLeft / MAX_TIME) * 100;
-  const oppPct = (oppTimeLeft / MAX_TIME) * 100;
+function startTimer(){stopTimer();timerInterval=setInterval(()=>send({type:'tick'}),300)}
+function stopTimer(){clearInterval(timerInterval);timerInterval=null}
 
-  const myBar = document.getElementById('my-timer-bar');
-  const oppBar = document.getElementById('opp-timer-bar');
-
-  myBar.style.width = myPct + '%';
-  oppBar.style.width = oppPct + '%';
-
-  document.getElementById('my-timer-text').textContent = myTimeLeft.toFixed(1) + 's';
-  document.getElementById('opp-timer-text').textContent = oppTimeLeft.toFixed(1) + 's';
-
-  // 危険色
-  myBar.className = 'timer-bar-fill my-bar' + (myTimeLeft < 15 ? ' danger' : '');
-  oppBar.className = 'timer-bar-fill opp-bar' + (oppTimeLeft < 15 ? ' danger' : '');
-}
-
-function renderHand(hand, currentCodeId) {
-  const grid = document.getElementById('hand-grid');
-  if (!hand || hand.length === 0) {
-    grid.innerHTML = '<div style="font-family: \'Share Tech Mono\', monospace; font-size: 0.75rem; color: var(--text-dim); padding: 1rem;">手札がありません</div>';
-    return;
-  }
-
-  grid.innerHTML = hand.map(card => {
-    if (!card) return '';
-    const isCurrent = card.id === currentCodeId;
-    const dots = Array.from({length: 4}, (_, i) =>
-      `<div class="diff-dot ${i < card.difficulty ? 'filled' : ''}"></div>`
-    ).join('');
-    const tags = (card.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
-
-    return `
-      <div class="card ${isCurrent ? 'solving' : ''}"
-           onclick="playCard('${card.id}')"
-           id="card-${card.id}">
-        <div class="card-difficulty">${dots}</div>
-        <div class="card-title">${escHtml(card.title)}</div>
-        <div class="card-tags">${tags}</div>
-      </div>`;
+function renderHand(hand,currentCard){
+  const el=document.getElementById('hand-list');
+  if(!hand?.length){el.innerHTML='<div class="empty-hand">手札がありません</div>';return}
+  const curId=currentCard?.id||null;
+  el.innerHTML=hand.map(c=>{
+    if(!c)return'';
+    const isCur=c.id===curId;
+    const pips=Array.from({length:4},(_,i)=>`<div class="pip${i<c.difficulty?' on':''}"></div>`).join('');
+    const tags=(c.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
+    return`<div class="card${isCur?' active-card':''}" onclick="playCard('${c.id}')">
+      <div class="card-title">${esc(c.title)}</div>
+      <div class="card-meta"><div class="card-tags">${tags}</div><div class="diff-pips">${pips}</div></div>
+    </div>`;
   }).join('');
 }
 
-function showCode(card) {
-  if (!card) return;
-  document.getElementById('no-code-msg').style.display = 'none';
-  document.getElementById('code-display-inner').style.display = 'block';
-  document.getElementById('code-title').textContent = `// ${card.title} //`;
-  document.getElementById('hint-btn').style.display = 'block';
-  document.getElementById('hint-text').textContent = card.hint || '';
-  hintVisible = false;
-  document.getElementById('hint-text').classList.remove('show');
-  document.getElementById('hint-btn').textContent = 'HINT?';
-
-  const codeEl = document.getElementById('code-content');
-  codeEl.textContent = card.code;
-  hljs.highlightElement(codeEl);
+function renderDeckPips(count){
+  const total=count+(gs?.me?.hand_count||0);
+  document.getElementById('deck-pips').innerHTML=
+    Array.from({length:Math.min(total,14)},(_,i)=>
+      `<div class="deck-pip ${i<count?'on':'off'}"></div>`).join('');
 }
 
-function hideCode() {
-  document.getElementById('no-code-msg').style.display = 'flex';
-  document.getElementById('code-display-inner').style.display = 'none';
-  document.getElementById('code-title').textContent = '// コードを選んでください //';
-  document.getElementById('hint-btn').style.display = 'none';
-  document.getElementById('answer-input').disabled = true;
-  document.getElementById('submit-btn').disabled = true;
-  document.getElementById('answer-input').value = '';
-  document.getElementById('feedback').textContent = '';
-  document.getElementById('feedback').className = 'feedback';
+function renderOppStatus(opp){
+  const dot=document.getElementById('opp-dot');
+  const txt=document.getElementById('opp-status');
+  if(opp.solving){dot.className='opp-dot solving';txt.textContent=`${oppName} が解読中...`;txt.style.color='var(--blue)'}
+  else{dot.className='opp-dot';txt.textContent=`${oppName} がカードを選んでいます`;txt.style.color='var(--dim)'}
 }
 
-function updateOpponentStatus(opp) {
-  const indicator = document.getElementById('opp-indicator');
-  const statusText = document.getElementById('opp-status-text');
-  if (opp.solving) {
-    indicator.classList.add('active');
-    statusText.textContent = `${opponentName} がコードを解いています...`;
-    statusText.style.color = 'var(--p2)';
-  } else {
-    indicator.classList.remove('active');
-    statusText.textContent = `${opponentName} がカードを選んでいます`;
-    statusText.style.color = 'var(--text-dim)';
+function showCode(card){
+  if(!card)return;
+  document.getElementById('code-title').textContent=`// ${card.title}`;
+  document.getElementById('hint-btn').style.display='block';
+  document.getElementById('hint-bar').textContent=card.hint||'';
+  hintOpen=false;
+  document.getElementById('hint-bar').classList.remove('show');
+  document.getElementById('hint-btn').textContent='HINT';
+  const display=document.getElementById('code-display');
+  display.innerHTML=`<pre class="code-pre"><code class="language-python" id="code-el"></code></pre>`;
+  document.getElementById('code-el').textContent=card.code;
+  hljs.highlightElement(document.getElementById('code-el'));
+}
+
+function clearCode(){
+  document.getElementById('code-display').innerHTML=`
+    <div class="no-code">
+      <div class="arrow-left">←</div>
+      <div>手札からカードを出して挑戦</div>
+      <div style="font-size:.65rem;color:var(--dim);margin-top:.3rem">タイマーは常時カウントダウン中！</div>
+    </div>`;
+  document.getElementById('code-title').textContent='← カードを選んでください';
+  document.getElementById('hint-btn').style.display='none';
+  document.getElementById('hint-bar').classList.remove('show');
+  document.getElementById('ans-in').disabled=true;
+  document.getElementById('ans-btn').disabled=true;
+  document.getElementById('ans-in').value='';
+  document.getElementById('feedback').textContent='';
+  document.getElementById('feedback').className='feedback-bar';
+}
+
+function toggleHint(){
+  hintOpen=!hintOpen;
+  document.getElementById('hint-bar').classList.toggle('show',hintOpen);
+  document.getElementById('hint-btn').textContent=hintOpen?'HIDE':'HINT';
+}
+
+function onAnswerResult(m){
+  const fb=document.getElementById('feedback');
+  if(m.correct){fb.textContent='✓ 正解！次のカードを選んでください';fb.className='feedback-bar ok';toast('正解！ +1 POINT','ok')}
+  else{fb.textContent=m.message;fb.className='feedback-bar bad'}
+}
+
+function onGameOver(m){
+  stopTimer();
+  const win=m.is_winner;
+  const r=document.getElementById('r-title');
+  r.textContent=win?'WIN!':'LOSE...';
+  r.className='result-big '+(win?'win':'lose');
+  let reason='';
+  if(m.reason==='opponent_disconnected')reason='相手が切断しました';
+  else if(m.state?.me?.time_left<=0)reason='タイムアップ！';
+  else if(m.state?.opponent?.time_left<=0)reason='相手のタイムアップ！';
+  document.getElementById('r-reason').textContent=reason;
+  if(m.state){
+    const me=m.state.me,op=m.state.opponent;
+    document.getElementById('r-grid').innerHTML=`
+      <div class="result-cell"><span class="result-cell-val" style="color:var(--red)">${me.score}</span><span class="result-cell-lbl">自分の正解数</span></div>
+      <div class="result-cell"><span class="result-cell-val" style="color:var(--blue)">${op.score}</span><span class="result-cell-lbl">相手の正解数</span></div>
+      <div class="result-cell"><span class="result-cell-val">${me.time_left.toFixed(1)}s</span><span class="result-cell-lbl">残り時間</span></div>
+      <div class="result-cell"><span class="result-cell-val">${me.solved_count}</span><span class="result-cell-lbl">解いた問題数</span></div>`;
   }
+  showView('result');
 }
 
-function updateDeckVisual(total) {
-  const vis = document.getElementById('deck-visual');
-  const deckCount = gameState ? gameState.me.deck_count : 0;
-  const handCount = gameState ? gameState.me.hand_count : 0;
-  const solved = total - deckCount - handCount;
-  vis.innerHTML = Array.from({length: Math.min(total, 15)}, (_, i) => {
-    const active = i < (deckCount + handCount);
-    return `<div class="deck-card-pip ${active ? 'active' : ''}"></div>`;
-  }).join('');
+function startMatch(){
+  const v=document.getElementById('uname').value.trim();
+  myName=v||'PLAYER_'+Math.floor(Math.random()*9999);
+  document.getElementById('uname').value=myName;
+  if(!ws||ws.readyState!==1){toast('接続中...','err');return}
+  send({type:'find_match',username:myName});
+}
+function cancelMatch(){send({type:'cancel_match'});showView('title')}
+function playCard(id){
+  if(gs?.me?.current_code){toast('既に解読中です！','err');return}
+  send({type:'play_card',card_id:id});
+}
+function submitAns(){
+  const v=document.getElementById('ans-in').value.trim();
+  if(!v)return;
+  send({type:'submit_answer',answer:v});
+  document.getElementById('ans-in').value='';
+}
+function goTitle(){showView('title');fetchStats()}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function toast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='show '+type;
+  setTimeout(()=>{t.className=''},2800);
+}
+async function fetchStats(){
+  try{const d=await(await fetch('/stats')).json();
+    document.getElementById('s-wait').textContent=d.waiting;
+    document.getElementById('s-games').textContent=d.active_games;
+    document.getElementById('s-online').textContent=d.total_connections;
+  }catch{}
 }
 
-// ==================== アクション ====================
-function startMatching() {
-  const input = document.getElementById('username-input');
-  myName = input.value.trim() || 'PLAYER_' + Math.floor(Math.random() * 9999);
-  input.value = myName;
-  document.getElementById('my-name-label').textContent = myName;
-
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    showToast('接続中...しばらくお待ちください', 'error');
-    return;
-  }
-
-  send({ type: 'find_match', username: myName });
-}
-
-function cancelMatch() {
-  send({ type: 'cancel_match' });
-  showScreen('title');
-}
-
-function playCard(cardId) {
-  if (gameState && gameState.me.current_code) {
-    showToast('既にコードを解いています！', 'error');
-    return;
-  }
-  const card = document.getElementById('card-' + cardId);
-  if (card) card.classList.add('card-play-anim');
-  send({ type: 'play_card', card_id: cardId });
-}
-
-function submitAnswer() {
-  const input = document.getElementById('answer-input');
-  const answer = input.value.trim();
-  if (!answer) return;
-  send({ type: 'submit_answer', answer });
-  input.value = '';
-}
-
-function handleAnswerResult(msg) {
-  const feedback = document.getElementById('feedback');
-  if (msg.correct) {
-    feedback.textContent = '✓ 正解！次のカードを選んでください';
-    feedback.className = 'feedback correct';
-    showToast('正解！+1ポイント', 'success');
-  } else {
-    feedback.textContent = msg.message;
-    feedback.className = 'feedback wrong';
-  }
-  setTimeout(() => {
-    if (!feedback.className.includes('correct')) {
-      // 不正解の場合、フィードバックを少し長く表示
-    } else {
-      feedback.className = 'feedback';
-    }
-  }, 3000);
-}
-
-function toggleHint() {
-  hintVisible = !hintVisible;
-  document.getElementById('hint-text').classList.toggle('show', hintVisible);
-  document.getElementById('hint-btn').textContent = hintVisible ? 'HIDE' : 'HINT?';
-}
-
-// ==================== タイマーループ ====================
-function startTimerLoop() {
-  stopTimerLoop();
-  timerInterval = setInterval(() => {
-    send({ type: 'tick' });
-  }, 300);
-}
-
-function stopTimerLoop() {
-  if (timerInterval) clearInterval(timerInterval);
-  timerInterval = null;
-}
-
-// ==================== ゲームオーバー ====================
-function showGameOver(msg) {
-  const isWin = msg.is_winner;
-  const reason = msg.reason;
-
-  document.getElementById('result-title').textContent = isWin ? 'WIN!' : 'LOSE...';
-  document.getElementById('result-title').className = 'result-title ' + (isWin ? 'result-win' : 'result-lose');
-
-  let reasonText = '';
-  if (reason === 'opponent_disconnected') {
-    reasonText = '相手が切断しました';
-  } else if (msg.state) {
-    const me = msg.state.me;
-    const opp = msg.state.opponent;
-    if (me.time_left <= 0) reasonText = 'タイムアップ！';
-    else if (opp.time_left <= 0) reasonText = '相手のタイムアップ！';
-  }
-  document.getElementById('result-reason').textContent = reasonText;
-
-  if (msg.state) {
-    const me = msg.state.me;
-    const opp = msg.state.opponent;
-    document.getElementById('result-stats').innerHTML = `
-      <div class="result-stat">
-        <span class="result-stat-value" style="color: var(--p1)">${me.score}</span>
-        あなたの正解数
-      </div>
-      <div class="result-stat">
-        <span class="result-stat-value" style="color: var(--p2)">${opp.score}</span>
-        相手の正解数
-      </div>
-      <div class="result-stat">
-        <span class="result-stat-value">${me.time_left.toFixed(1)}s</span>
-        残り時間
-      </div>
-      <div class="result-stat">
-        <span class="result-stat-value">${me.solved_count}</span>
-        解いた問題数
-      </div>
-    `;
-  }
-
-  showScreen('result');
-}
-
-function backToTitle() {
-  showScreen('title');
-  fetchStats();
-}
-
-// ==================== ユーティリティ ====================
-function showScreen(name) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(name + '-screen').classList.add('active');
-  currentScreen = name;
-}
-
-function showToast(msg, type = '') {
-  const toast = document.getElementById('toast');
-  toast.textContent = msg;
-  toast.className = 'show ' + type;
-  setTimeout(() => { toast.className = ''; }, 3000);
-}
-
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-async function fetchStats() {
-  try {
-    const res = await fetch('/stats');
-    const data = await res.json();
-    document.getElementById('stat-waiting').textContent = data.waiting;
-    document.getElementById('stat-games').textContent = data.active_games;
-    document.getElementById('stat-players').textContent = data.total_connections;
-  } catch(e) {}
-}
-
-// ==================== 起動 ====================
 connectWS();
-
-// Enterキー for matching
-document.getElementById('username-input').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') startMatching();
-});
+document.getElementById('uname').addEventListener('keydown',e=>{if(e.key==='Enter')startMatch()});
 </script>
 </body>
 </html>
