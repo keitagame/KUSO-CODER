@@ -1,99 +1,1284 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>クソコードバトル</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Dots&family=Share+Tech+Mono&family=M+PLUS+1p:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a28;
+    --border: #2a2a45;
+    --accent: #ff3366;
+    --accent2: #00ffcc;
+    --accent3: #ffcc00;
+    --text: #e0e0ff;
+    --text-dim: #7070a0;
+    --danger: #ff4444;
+    --success: #00ff88;
+    --p1: #ff3366;
+    --p2: #00aaff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'M PLUS 1p', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ノイズテクスチャ背景 */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* スキャンライン */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,204,0.01) 2px, rgba(0,255,204,0.01) 4px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ============ SCREENS ============ */
+  .screen { display: none; position: relative; z-index: 1; }
+  .screen.active { display: block; }
+
+  /* ============ TITLE SCREEN ============ */
+  #title-screen {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .title-glitch {
+    font-family: 'Zen Dots', cursive;
+    font-size: clamp(2.5rem, 8vw, 6rem);
+    color: var(--accent);
+    text-shadow:
+      0 0 20px var(--accent),
+      0 0 60px rgba(255,51,102,0.4),
+      2px 2px 0 var(--accent2),
+      -2px -2px 0 var(--accent3);
+    letter-spacing: 0.05em;
+    animation: glitch 3s infinite;
+    margin-bottom: 0.5rem;
+  }
+
+  @keyframes glitch {
+    0%, 90%, 100% { transform: none; filter: none; }
+    92% { transform: skew(-1deg); filter: hue-rotate(90deg); }
+    94% { transform: skew(1deg) translateX(3px); filter: hue-rotate(-90deg); }
+    96% { transform: none; filter: hue-rotate(0deg); }
+  }
+
+  .title-sub {
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--accent2);
+    font-size: 1rem;
+    letter-spacing: 0.3em;
+    margin-bottom: 3rem;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  .server-stats {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 3rem;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  .stat-item { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+  .stat-value { color: var(--accent2); font-size: 1.4rem; font-weight: 700; }
+
+  .name-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: center;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .input-field {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    color: var(--text);
+    padding: 0.8rem 1.2rem;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1rem;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  }
+
+  .input-field:focus { border-color: var(--accent2); }
+
+  .btn {
+    background: transparent;
+    border: 2px solid var(--accent);
+    color: var(--accent);
+    padding: 0.8rem 2.5rem;
+    font-family: 'Zen Dots', cursive;
+    font-size: 1rem;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    transition: all 0.2s;
+    position: relative;
+    clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  }
+
+  .btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: -1;
+  }
+
+  .btn:hover { color: #000; }
+  .btn:hover::before { opacity: 1; }
+
+  .btn-secondary { border-color: var(--accent2); color: var(--accent2); }
+  .btn-secondary:hover { color: #000; }
+  .btn-secondary::before { background: var(--accent2); }
+
+  /* ============ MATCHING SCREEN ============ */
+  #matching-screen {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 2rem;
+  }
+
+  .matching-radar {
+    width: 200px;
+    height: 200px;
+    border: 2px solid var(--accent2);
+    border-radius: 50%;
+    position: relative;
+    animation: radarSpin 2s linear infinite;
+  }
+
+  .matching-radar::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 50%;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent2), transparent);
+    transform-origin: left center;
+    animation: radarBeam 2s linear infinite;
+  }
+
+  @keyframes radarSpin { 0% {} 100% {} }
+  @keyframes radarBeam { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+  .matching-text {
+    font-family: 'Zen Dots', cursive;
+    font-size: 1.5rem;
+    color: var(--accent2);
+    animation: pulse 1s infinite;
+  }
+
+  /* ============ GAME SCREEN ============ */
+  #game-screen {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    gap: 0.8rem;
+  }
+
+  /* タイマーバー */
+  .timer-bars {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .timer-bar-wrap {
+    height: 40px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .timer-bar-fill {
+    height: 100%;
+    transition: width 0.5s linear, background-color 0.5s;
+    background: var(--accent2);
+  }
+
+  .timer-bar-fill.my-bar { background: var(--p1); }
+  .timer-bar-fill.opp-bar { background: var(--p2); transform-origin: right; }
+
+  .timer-bar-wrap.reversed { direction: rtl; }
+
+  .timer-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+    z-index: 1;
+    direction: ltr;
+  }
+
+  .timer-divider {
+    text-align: center;
+    font-family: 'Zen Dots', cursive;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+  }
+
+  .vs-badge {
+    font-size: 1.2rem;
+    color: var(--accent3);
+    text-shadow: 0 0 20px var(--accent3);
+  }
+
+  /* スコア */
+  .score-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1rem;
+    align-items: center;
+    text-align: center;
+  }
+
+  .player-score {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .player-name {
+    font-family: 'Zen Dots', cursive;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.2rem;
+  }
+
+  .score-num {
+    font-family: 'Zen Dots', cursive;
+    font-size: 2rem;
+    line-height: 1;
+  }
+
+  .my-score .score-num { color: var(--p1); text-shadow: 0 0 20px var(--p1); }
+  .opp-score .score-num { color: var(--p2); text-shadow: 0 0 20px var(--p2); }
+
+  /* メインゲームエリア */
+  .game-main {
+    display: grid;
+    grid-template-columns: 1fr 1.6fr;
+    gap: 0.8rem;
+    flex: 1;
+  }
+
+  /* デッキ / 手札パネル */
+  .deck-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .panel-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  .hand-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+  }
+
+  /* カード */
+  .card {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    padding: 0.7rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+
+  .card:hover {
+    border-color: var(--accent3);
+    background: var(--surface2);
+    transform: translateX(4px);
+  }
+
+  .card.selected {
+    border-color: var(--accent);
+    background: rgba(255,51,102,0.1);
+    box-shadow: 0 0 20px rgba(255,51,102,0.3);
+  }
+
+  .card.solving {
+    border-color: var(--accent2);
+    animation: solvingPulse 1s infinite;
+  }
+
+  @keyframes solvingPulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(0,255,204,0.3); }
+    50% { box-shadow: 0 0 25px rgba(0,255,204,0.7); }
+  }
+
+  .card-title {
+    font-family: 'Zen Dots', cursive;
+    font-size: 0.75rem;
+    color: var(--accent3);
+    margin-bottom: 0.3rem;
+  }
+
+  .card-tags {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+  }
+
+  .card-difficulty {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.6rem;
+    display: flex;
+    gap: 2px;
+  }
+
+  .diff-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--border);
+  }
+
+  .diff-dot.filled { background: var(--accent3); }
+
+  .deck-info {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    padding: 0.4rem 0.2rem;
+    border-top: 1px solid var(--border);
+  }
+
+  /* コードパネル */
+  .code-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .code-display {
+    background: #1a1b26;
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--accent);
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    min-height: 200px;
+  }
+
+  .code-display-inner {
+    padding: 1rem;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+  .no-code-msg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    gap: 0.5rem;
+  }
+
+  .no-code-arrow {
+    font-size: 2rem;
+    animation: arrowBounce 1s infinite;
+  }
+
+  @keyframes arrowBounce {
+    0%, 100% { transform: translateX(-5px); }
+    50% { transform: translateX(5px); }
+  }
+
+  .code-title-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 0.5rem 0.3rem;
+  }
+
+  .code-card-name {
+    font-family: 'Zen Dots', cursive;
+    font-size: 0.8rem;
+    color: var(--accent3);
+  }
+
+  .hint-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    padding: 0.2rem 0.6rem;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    transition: all 0.2s;
+  }
+
+  .hint-btn:hover { border-color: var(--accent3); color: var(--accent3); }
+
+  .hint-text {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent3);
+    padding: 0.5rem;
+    background: rgba(255,204,0,0.05);
+    border: 1px dashed rgba(255,204,0,0.3);
+    display: none;
+  }
+
+  .hint-text.show { display: block; }
+
+  /* 回答エリア */
+  .answer-area {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .answer-input {
+    flex: 1;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    color: var(--text);
+    padding: 0.7rem 1rem;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+  }
+
+  .answer-input:focus { border-color: var(--accent2); }
+  .answer-input:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .submit-btn {
+    background: var(--accent);
+    border: none;
+    color: #000;
+    padding: 0.7rem 1.5rem;
+    font-family: 'Zen Dots', cursive;
+    font-size: 0.85rem;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    transition: all 0.2s;
+    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+    font-weight: 700;
+  }
+
+  .submit-btn:hover { background: #ff6688; transform: scale(1.02); }
+  .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* フィードバックメッセージ */
+  .feedback {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    padding: 0.5rem;
+    text-align: center;
+    border: 1px solid transparent;
+    transition: all 0.3s;
+    min-height: 36px;
+  }
+
+  .feedback.correct {
+    color: var(--success);
+    border-color: var(--success);
+    background: rgba(0,255,136,0.05);
+    animation: feedbackFlash 0.3s;
+  }
+
+  .feedback.wrong {
+    color: var(--danger);
+    border-color: var(--danger);
+    background: rgba(255,68,68,0.05);
+    animation: feedbackFlash 0.3s;
+  }
+
+  @keyframes feedbackFlash {
+    0% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+
+  /* 相手状態パネル */
+  .opponent-status {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--p2);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+
+  .opp-solving-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--p2);
+  }
+
+  .opp-solving-indicator.active { animation: solvingBlink 0.5s infinite; }
+  @keyframes solvingBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  /* ============ RESULT SCREEN ============ */
+  #result-screen {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 2rem;
+    padding: 2rem;
+  }
+
+  .result-title {
+    font-family: 'Zen Dots', cursive;
+    font-size: clamp(3rem, 10vw, 7rem);
+    animation: resultAppear 0.5s ease-out;
+  }
+
+  .result-win { color: var(--success); text-shadow: 0 0 40px var(--success); }
+  .result-lose { color: var(--danger); text-shadow: 0 0 40px var(--danger); }
+
+  @keyframes resultAppear {
+    0% { transform: scale(0.5) rotate(-5deg); opacity: 0; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+
+  .result-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.9rem;
+    color: var(--text-dim);
+  }
+
+  .result-stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1rem;
+  }
+
+  .result-stat-value {
+    font-size: 1.8rem;
+    color: var(--text);
+    display: block;
+    font-weight: 700;
+  }
+
+  /* ============ LOADING / TOAST ============ */
+  #toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 0.7rem 1.5rem;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    z-index: 1000;
+    transition: transform 0.3s;
+    max-width: 400px;
+    text-align: center;
+  }
+
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.success { border-color: var(--success); color: var(--success); }
+  #toast.error { border-color: var(--danger); color: var(--danger); }
+
+  /* hljs カスタム */
+  .hljs { background: transparent !important; padding: 0 !important; }
+
+  /* タイマー警告 */
+  .timer-bar-fill.danger { background: var(--danger) !important; animation: dangerPulse 0.5s infinite; }
+  @keyframes dangerPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+  /* レスポンシブ */
+  @media (max-width: 700px) {
+    .game-main { grid-template-columns: 1fr; }
+    .code-panel { order: -1; }
+    .card { padding: 0.5rem; }
+  }
+
+  /* カードをプレイするアニメ */
+  @keyframes cardPlay {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(20px) scale(1.05); }
+    100% { transform: translateX(0); }
+  }
+
+  .card-play-anim { animation: cardPlay 0.3s ease-out; }
+
+  /* 接続状態 */
+  .connection-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--danger);
+    display: inline-block;
+    margin-right: 0.5rem;
+  }
+
+  .connection-dot.connected { background: var(--success); }
+
+  .status-bar {
+    position: fixed;
+    top: 0.5rem;
+    right: 0.5rem;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    z-index: 100;
+  }
+
+  /* デッキカウンター可視化 */
+  .deck-visual {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+    padding: 0.3rem 0;
+  }
+
+  .deck-card-pip {
+    width: 12px;
+    height: 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    clip-path: polygon(0 0, calc(100% - 3px) 0, 100% 3px, 100% 100%, 3px 100%, 0 calc(100% - 3px));
+  }
+
+  .deck-card-pip.active { background: var(--p1); border-color: var(--p1); }
+</style>
+</head>
 <body>
 
-<h2>クソコーダー</h2>
+<div class="status-bar">
+  <span class="connection-dot" id="conn-dot"></span>
+  <span id="conn-text">OFFLINE</span>
+</div>
 
-<button onclick="login()">Login</button>
-<button onclick="queue()">Match</button>
-<button onclick="play()">Play</button>
+<!-- TITLE SCREEN -->
+<div id="title-screen" class="screen active">
+  <div class="title-glitch">クソコードバトル</div>
+  <div class="title-sub">// UGLY CODE SHOWDOWN //</div>
 
-<h3>Deck（1行1カード）</h3>
-<textarea id="deck" rows="10" cols="50"></textarea>
-<br>
-<button onclick="save()">Save Deck</button>
+  <div class="server-stats" id="server-stats">
+    <div class="stat-item">
+      <span class="stat-value" id="stat-waiting">-</span>
+      <span>WAITING</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-value" id="stat-games">-</span>
+      <span>ACTIVE GAMES</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-value" id="stat-players">-</span>
+      <span>ONLINE</span>
+    </div>
+  </div>
 
-<h3>Game</h3>
-Turn: <span id="turn"></span><br>
-Time: <span id="time"></span><br>
+  <div class="name-input-group">
+    <input type="text" class="input-field" id="username-input" placeholder="YOUR_USERNAME" maxlength="16" autocomplete="off">
+    <button class="btn" onclick="startMatching()">BATTLE START</button>
+  </div>
 
-<pre id="code"></pre>
+  <div style="margin-top: 2rem; font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; color: var(--text-dim); max-width: 400px; line-height: 1.8;">
+    <div style="color: var(--accent3); margin-bottom: 0.5rem;">// HOW TO PLAY //</div>
+    <div>① 全世界のプレイヤーとマッチング</div>
+    <div>② 手札からクソコードカードを選んで出す</div>
+    <div>③ コードの出力値を当てる</div>
+    <div>④ タイマーが先に切れたら<span style="color: var(--danger)"> GAME OVER</span></div>
+    <div>⑤ 多く正解した方が勝ち（タイマー残量が多い方）</div>
+  </div>
+</div>
 
-<input id="guess">
-<button onclick="guess()">Guess</button>
+<!-- MATCHING SCREEN -->
+<div id="matching-screen" class="screen">
+  <div class="matching-radar"></div>
+  <div class="matching-text">SEARCHING FOR OPPONENT...</div>
+  <div style="font-family: 'Share Tech Mono', monospace; font-size: 0.8rem; color: var(--text-dim);">
+    全世界マッチング中 - しばらくお待ちください
+  </div>
+  <button class="btn btn-secondary" onclick="cancelMatch()">CANCEL</button>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen" class="screen">
+  <!-- タイマーバー -->
+  <div class="timer-bars">
+    <div class="timer-bar-wrap">
+      <div class="timer-bar-fill my-bar" id="my-timer-bar" style="width:100%"></div>
+      <div class="timer-text" id="my-timer-text">60.0s</div>
+    </div>
+    <div class="timer-divider">
+      <span class="vs-badge">VS</span>
+      <span style="font-size:0.6rem; color: var(--text-dim);" id="opponent-name-label">OPPONENT</span>
+    </div>
+    <div class="timer-bar-wrap reversed">
+      <div class="timer-bar-fill opp-bar" id="opp-timer-bar" style="width:100%"></div>
+      <div class="timer-text" id="opp-timer-text">60.0s</div>
+    </div>
+  </div>
+
+  <!-- スコア -->
+  <div class="score-row">
+    <div class="player-score my-score">
+      <div class="player-name" style="color: var(--p1);" id="my-name-label">YOU</div>
+      <div class="score-num" id="my-score">0</div>
+      <div style="font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; color: var(--text-dim);">SOLVED</div>
+    </div>
+    <div style="font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; color: var(--text-dim); text-align: center;">
+      <div id="game-id-label" style="color: var(--border); font-size: 0.6rem;">GAME #----</div>
+    </div>
+    <div class="player-score opp-score">
+      <div class="player-name" style="color: var(--p2);" id="opp-name-label">OPPONENT</div>
+      <div class="score-num" id="opp-score">0</div>
+      <div style="font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; color: var(--text-dim);">SOLVED</div>
+    </div>
+  </div>
+
+  <!-- メインゲームエリア -->
+  <div class="game-main">
+    <!-- 左: 手札 -->
+    <div class="deck-panel">
+      <div class="panel-label">// HAND - カードを選んで出す //</div>
+      <div class="hand-grid" id="hand-grid"></div>
+      <div class="deck-info">
+        <span>DECK: <span id="deck-count">0</span></span>
+        <span>HAND: <span id="hand-count">0</span>/5</span>
+      </div>
+      <div class="deck-visual" id="deck-visual"></div>
+
+      <!-- 相手状態 -->
+      <div class="opponent-status">
+        <div class="opp-solving-indicator" id="opp-indicator"></div>
+        <span id="opp-status-text">相手を待っています</span>
+      </div>
+    </div>
+
+    <!-- 右: コードエリア -->
+    <div class="code-panel">
+      <div class="code-title-bar">
+        <div class="code-card-name" id="code-title">// コードを選んでください //</div>
+        <button class="hint-btn" id="hint-btn" onclick="toggleHint()" style="display:none">HINT?</button>
+      </div>
+      <div class="code-display">
+        <div class="no-code-msg" id="no-code-msg">
+          <div class="no-code-arrow">←</div>
+          <div>手札からカードを選んで出しましょう</div>
+          <div style="font-size: 0.7rem;">タイマーは解いている間だけ進みます</div>
+        </div>
+        <div class="code-display-inner" id="code-display-inner" style="display:none">
+          <pre><code class="language-python" id="code-content"></code></pre>
+        </div>
+      </div>
+      <div class="hint-text" id="hint-text"></div>
+
+      <div class="answer-area">
+        <input type="text"
+               class="answer-input"
+               id="answer-input"
+               placeholder="出力結果を入力... (Enterで送信)"
+               disabled
+               autocomplete="off"
+               onkeydown="if(event.key==='Enter') submitAnswer()">
+        <button class="submit-btn" id="submit-btn" onclick="submitAnswer()" disabled>送信</button>
+      </div>
+      <div class="feedback" id="feedback"></div>
+    </div>
+  </div>
+</div>
+
+<!-- RESULT SCREEN -->
+<div id="result-screen" class="screen">
+  <div class="result-title" id="result-title">WIN!</div>
+  <div style="font-family: 'Share Tech Mono', monospace; color: var(--text-dim);" id="result-reason"></div>
+  <div class="result-stats" id="result-stats"></div>
+  <button class="btn" onclick="backToTitle()">PLAY AGAIN</button>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
 
 <script>
-let server = "https://kuso-coder.onrender.com";
-let id = null;
-let state = {};
+// ==================== 状態管理 ====================
+let ws = null;
+let gameState = null;
+let myName = '';
+let opponentName = '';
+let timerInterval = null;
+let currentScreen = 'title';
+let hintVisible = false;
+let myTimeLeft = 60;
+let oppTimeLeft = 60;
+const MAX_TIME = 60;
 
-async function login(){
-  let r = await fetch(server+"/login",{method:"POST"});
-  id = (await r.json()).id;
+// ==================== WS接続 ====================
+function connectWS() {
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${location.host}/ws`;
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    setConnectionStatus(true);
+    // pingループ
+    setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
+    }, 5000);
+    // サーバー統計定期取得
+    fetchStats();
+    setInterval(fetchStats, 5000);
+  };
+
+  ws.onclose = () => {
+    setConnectionStatus(false);
+    setTimeout(connectWS, 3000);
+  };
+
+  ws.onerror = () => setConnectionStatus(false);
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    handleMessage(msg);
+  };
 }
 
-async function save(){
-  let deck = document.getElementById("deck")
-    .value.split("\n");
-  await fetch(server+"/deck",{
-    method:"POST",
-    body:JSON.stringify({id,deck})
-  });
+function setConnectionStatus(connected) {
+  document.getElementById('conn-dot').className = 'connection-dot' + (connected ? ' connected' : '');
+  document.getElementById('conn-text').textContent = connected ? 'ONLINE' : 'OFFLINE';
 }
 
-async function queue(){
-  await fetch(server+"/queue",{
-    method:"POST",
-    body:JSON.stringify({id})
-  });
+function send(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
 }
 
-async function play(){
-  let r = await fetch(server+"/play",{
-    method:"POST",
-    body:JSON.stringify({id})
-  });
-  let j = await r.json();
-  if(j.code) highlight(j.code);
+// ==================== メッセージハンドラ ====================
+function handleMessage(msg) {
+  switch (msg.type) {
+    case 'pong': break;
+
+    case 'waiting':
+      showScreen('matching');
+      break;
+
+    case 'game_start':
+      opponentName = msg.opponent_name;
+      document.getElementById('game-id-label').textContent = `GAME #${msg.game_id.substring(0,6).toUpperCase()}`;
+      document.getElementById('my-name-label').textContent = myName;
+      document.getElementById('opp-name-label').textContent = opponentName;
+      document.getElementById('opponent-name-label').textContent = opponentName;
+      updateGameState(msg.state);
+      showScreen('game');
+      startTimerLoop();
+      showToast('🎮 マッチング成功！バトル開始！', 'success');
+      break;
+
+    case 'state_update':
+      updateGameState(msg.state);
+      break;
+
+    case 'timer_update':
+      myTimeLeft = msg.my_time;
+      oppTimeLeft = msg.opponent_time;
+      updateTimerDisplay();
+      break;
+
+    case 'answer_result':
+      handleAnswerResult(msg);
+      break;
+
+    case 'game_over':
+      stopTimerLoop();
+      showGameOver(msg);
+      break;
+
+    case 'error':
+      showToast(msg.message, 'error');
+      break;
+  }
 }
 
-async function guess(){
-  let g = document.getElementById("guess").value;
-  await fetch(server+"/guess",{
-    method:"POST",
-    body:JSON.stringify({id,guess:g})
-  });
-}
+// ==================== ゲーム状態更新 ====================
+function updateGameState(state) {
+  gameState = state;
 
-function highlight(code){
-  let c = code
-    .replace(/(\d+)/g,"<b>$1</b>")
-    .replace(/(\+|\-|\*|\/)/g,"<u>$1</u>")
-    .replace(/([a-zA-Z]+)/g,"<i>$1</i>");
-  document.getElementById("code").innerHTML = c;
-}
+  // スコア
+  document.getElementById('my-score').textContent = state.me.score;
+  document.getElementById('opp-score').textContent = state.opponent.score;
 
-async function update(){
-  if(!id) return;
+  // タイマー
+  myTimeLeft = state.me.time_left;
+  oppTimeLeft = state.opponent.time_left;
+  updateTimerDisplay();
 
-  let r = await fetch(server+"/state?id="+id);
-  state = await r.json();
+  // デッキ情報
+  document.getElementById('deck-count').textContent = state.me.deck_count;
+  document.getElementById('hand-count').textContent = state.me.hand_count;
+  updateDeckVisual(state.me.deck_count + state.me.hand_count);
 
-  if(state.turn){
-    document.getElementById("turn").innerText =
-      state.turn == id ? "YOU" : "OPPONENT";
+  // 手札
+  renderHand(state.me.hand, state.me.current_code);
 
-    document.getElementById("time").innerText =
-      state.time[id];
+  // コード表示
+  if (state.me.current_code) {
+    showCode(state.me.current_code);
+    document.getElementById('answer-input').disabled = false;
+    document.getElementById('submit-btn').disabled = false;
+  } else {
+    hideCode();
   }
 
-  if(state.code && state.last != id){
-    highlight(state.code);
+  // 相手状態
+  updateOpponentStatus(state.opponent);
+
+  // ゲームオーバー
+  if (state.finished) {
+    stopTimerLoop();
   }
 }
 
-setInterval(update, 1000);
+function updateTimerDisplay() {
+  const myPct = (myTimeLeft / MAX_TIME) * 100;
+  const oppPct = (oppTimeLeft / MAX_TIME) * 100;
+
+  const myBar = document.getElementById('my-timer-bar');
+  const oppBar = document.getElementById('opp-timer-bar');
+
+  myBar.style.width = myPct + '%';
+  oppBar.style.width = oppPct + '%';
+
+  document.getElementById('my-timer-text').textContent = myTimeLeft.toFixed(1) + 's';
+  document.getElementById('opp-timer-text').textContent = oppTimeLeft.toFixed(1) + 's';
+
+  // 危険色
+  myBar.className = 'timer-bar-fill my-bar' + (myTimeLeft < 15 ? ' danger' : '');
+  oppBar.className = 'timer-bar-fill opp-bar' + (oppTimeLeft < 15 ? ' danger' : '');
+}
+
+function renderHand(hand, currentCodeId) {
+  const grid = document.getElementById('hand-grid');
+  if (!hand || hand.length === 0) {
+    grid.innerHTML = '<div style="font-family: \'Share Tech Mono\', monospace; font-size: 0.75rem; color: var(--text-dim); padding: 1rem;">手札がありません</div>';
+    return;
+  }
+
+  grid.innerHTML = hand.map(card => {
+    if (!card) return '';
+    const isCurrent = card.id === currentCodeId;
+    const dots = Array.from({length: 4}, (_, i) =>
+      `<div class="diff-dot ${i < card.difficulty ? 'filled' : ''}"></div>`
+    ).join('');
+    const tags = (card.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
+
+    return `
+      <div class="card ${isCurrent ? 'solving' : ''}"
+           onclick="playCard('${card.id}')"
+           id="card-${card.id}">
+        <div class="card-difficulty">${dots}</div>
+        <div class="card-title">${escHtml(card.title)}</div>
+        <div class="card-tags">${tags}</div>
+      </div>`;
+  }).join('');
+}
+
+function showCode(card) {
+  if (!card) return;
+  document.getElementById('no-code-msg').style.display = 'none';
+  document.getElementById('code-display-inner').style.display = 'block';
+  document.getElementById('code-title').textContent = `// ${card.title} //`;
+  document.getElementById('hint-btn').style.display = 'block';
+  document.getElementById('hint-text').textContent = card.hint || '';
+  hintVisible = false;
+  document.getElementById('hint-text').classList.remove('show');
+  document.getElementById('hint-btn').textContent = 'HINT?';
+
+  const codeEl = document.getElementById('code-content');
+  codeEl.textContent = card.code;
+  hljs.highlightElement(codeEl);
+}
+
+function hideCode() {
+  document.getElementById('no-code-msg').style.display = 'flex';
+  document.getElementById('code-display-inner').style.display = 'none';
+  document.getElementById('code-title').textContent = '// コードを選んでください //';
+  document.getElementById('hint-btn').style.display = 'none';
+  document.getElementById('answer-input').disabled = true;
+  document.getElementById('submit-btn').disabled = true;
+  document.getElementById('answer-input').value = '';
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = 'feedback';
+}
+
+function updateOpponentStatus(opp) {
+  const indicator = document.getElementById('opp-indicator');
+  const statusText = document.getElementById('opp-status-text');
+  if (opp.solving) {
+    indicator.classList.add('active');
+    statusText.textContent = `${opponentName} がコードを解いています...`;
+    statusText.style.color = 'var(--p2)';
+  } else {
+    indicator.classList.remove('active');
+    statusText.textContent = `${opponentName} がカードを選んでいます`;
+    statusText.style.color = 'var(--text-dim)';
+  }
+}
+
+function updateDeckVisual(total) {
+  const vis = document.getElementById('deck-visual');
+  const deckCount = gameState ? gameState.me.deck_count : 0;
+  const handCount = gameState ? gameState.me.hand_count : 0;
+  const solved = total - deckCount - handCount;
+  vis.innerHTML = Array.from({length: Math.min(total, 15)}, (_, i) => {
+    const active = i < (deckCount + handCount);
+    return `<div class="deck-card-pip ${active ? 'active' : ''}"></div>`;
+  }).join('');
+}
+
+// ==================== アクション ====================
+function startMatching() {
+  const input = document.getElementById('username-input');
+  myName = input.value.trim() || 'PLAYER_' + Math.floor(Math.random() * 9999);
+  input.value = myName;
+  document.getElementById('my-name-label').textContent = myName;
+
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    showToast('接続中...しばらくお待ちください', 'error');
+    return;
+  }
+
+  send({ type: 'find_match', username: myName });
+}
+
+function cancelMatch() {
+  send({ type: 'cancel_match' });
+  showScreen('title');
+}
+
+function playCard(cardId) {
+  if (gameState && gameState.me.current_code) {
+    showToast('既にコードを解いています！', 'error');
+    return;
+  }
+  const card = document.getElementById('card-' + cardId);
+  if (card) card.classList.add('card-play-anim');
+  send({ type: 'play_card', card_id: cardId });
+}
+
+function submitAnswer() {
+  const input = document.getElementById('answer-input');
+  const answer = input.value.trim();
+  if (!answer) return;
+  send({ type: 'submit_answer', answer });
+  input.value = '';
+}
+
+function handleAnswerResult(msg) {
+  const feedback = document.getElementById('feedback');
+  if (msg.correct) {
+    feedback.textContent = '✓ 正解！次のカードを選んでください';
+    feedback.className = 'feedback correct';
+    showToast('正解！+1ポイント', 'success');
+  } else {
+    feedback.textContent = msg.message;
+    feedback.className = 'feedback wrong';
+  }
+  setTimeout(() => {
+    if (!feedback.className.includes('correct')) {
+      // 不正解の場合、フィードバックを少し長く表示
+    } else {
+      feedback.className = 'feedback';
+    }
+  }, 3000);
+}
+
+function toggleHint() {
+  hintVisible = !hintVisible;
+  document.getElementById('hint-text').classList.toggle('show', hintVisible);
+  document.getElementById('hint-btn').textContent = hintVisible ? 'HIDE' : 'HINT?';
+}
+
+// ==================== タイマーループ ====================
+function startTimerLoop() {
+  stopTimerLoop();
+  timerInterval = setInterval(() => {
+    send({ type: 'tick' });
+  }, 300);
+}
+
+function stopTimerLoop() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = null;
+}
+
+// ==================== ゲームオーバー ====================
+function showGameOver(msg) {
+  const isWin = msg.is_winner;
+  const reason = msg.reason;
+
+  document.getElementById('result-title').textContent = isWin ? 'WIN!' : 'LOSE...';
+  document.getElementById('result-title').className = 'result-title ' + (isWin ? 'result-win' : 'result-lose');
+
+  let reasonText = '';
+  if (reason === 'opponent_disconnected') {
+    reasonText = '相手が切断しました';
+  } else if (msg.state) {
+    const me = msg.state.me;
+    const opp = msg.state.opponent;
+    if (me.time_left <= 0) reasonText = 'タイムアップ！';
+    else if (opp.time_left <= 0) reasonText = '相手のタイムアップ！';
+  }
+  document.getElementById('result-reason').textContent = reasonText;
+
+  if (msg.state) {
+    const me = msg.state.me;
+    const opp = msg.state.opponent;
+    document.getElementById('result-stats').innerHTML = `
+      <div class="result-stat">
+        <span class="result-stat-value" style="color: var(--p1)">${me.score}</span>
+        あなたの正解数
+      </div>
+      <div class="result-stat">
+        <span class="result-stat-value" style="color: var(--p2)">${opp.score}</span>
+        相手の正解数
+      </div>
+      <div class="result-stat">
+        <span class="result-stat-value">${me.time_left.toFixed(1)}s</span>
+        残り時間
+      </div>
+      <div class="result-stat">
+        <span class="result-stat-value">${me.solved_count}</span>
+        解いた問題数
+      </div>
+    `;
+  }
+
+  showScreen('result');
+}
+
+function backToTitle() {
+  showScreen('title');
+  fetchStats();
+}
+
+// ==================== ユーティリティ ====================
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(name + '-screen').classList.add('active');
+  currentScreen = name;
+}
+
+function showToast(msg, type = '') {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = 'show ' + type;
+  setTimeout(() => { toast.className = ''; }, 3000);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function fetchStats() {
+  try {
+    const res = await fetch('/stats');
+    const data = await res.json();
+    document.getElementById('stat-waiting').textContent = data.waiting;
+    document.getElementById('stat-games').textContent = data.active_games;
+    document.getElementById('stat-players').textContent = data.total_connections;
+  } catch(e) {}
+}
+
+// ==================== 起動 ====================
+connectWS();
+
+// Enterキー for matching
+document.getElementById('username-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') startMatching();
+});
 </script>
-
 </body>
 </html>
